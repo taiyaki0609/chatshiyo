@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <title>チャッツイヨ</title>
 
   <style>
@@ -105,7 +104,6 @@
     <h1>💬 チャッツイヨ</h1>
 
     <div id="loginArea" class="card">
-
       <h2>チャットに入る</h2>
 
       <input
@@ -123,7 +121,6 @@
       >
 
       <button onclick="joinRoom()">入室する</button>
-
     </div>
 
     <div id="chatArea" class="card">
@@ -133,7 +130,6 @@
       <div id="messages"></div>
 
       <div class="send-area">
-
         <input
           type="text"
           id="messageInput"
@@ -142,7 +138,6 @@
         >
 
         <button onclick="sendMessage()">送信</button>
-
       </div>
 
     </div>
@@ -152,7 +147,6 @@
   <script src="/socket.io/socket.io.js"></script>
 
   <script>
-
     const socket = io();
 
     const loginArea = document.getElementById("loginArea");
@@ -166,7 +160,6 @@
     const roomTitle = document.getElementById("roomTitle");
 
     function joinRoom() {
-
       const username = usernameInput.value.trim();
       const room = roomInput.value.trim();
 
@@ -189,7 +182,6 @@
     }
 
     function sendMessage() {
-
       const message = messageInput.value.trim();
 
       if (!message) return;
@@ -201,39 +193,30 @@
     }
 
     socket.on("chatMessage", (data) => {
-
       const div = document.createElement("div");
 
       div.className = "message";
-
       div.textContent = data.username + "： " + data.message;
 
       messages.appendChild(div);
-
       messages.scrollTop = messages.scrollHeight;
     });
 
     socket.on("systemMessage", (data) => {
-
       const div = document.createElement("div");
 
       div.className = "system";
-
       div.textContent = data.message;
 
       messages.appendChild(div);
-
       messages.scrollTop = messages.scrollHeight;
     });
 
     messageInput.addEventListener("keydown", (event) => {
-
       if (event.key === "Enter") {
         sendMessage();
       }
-
     });
-
   </script>
 
 </body>
