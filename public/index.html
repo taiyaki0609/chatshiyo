@@ -1,409 +1,997 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>チャット</title>
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>チャッツイヨ</title>
+
 
   <style>
+
     * {
       box-sizing: border-box;
     }
 
+
     body {
+
       margin: 0;
-      font-family: Arial, sans-serif;
+
+      font-family:
+        Arial,
+        "Noto Sans JP",
+        sans-serif;
+
       background: #f2f4f7;
+
       color: #222;
+
     }
+
 
     .container {
+
       max-width: 700px;
+
       margin: 40px auto;
+
       padding: 20px;
+
     }
+
 
     h1 {
+
       text-align: center;
+
       margin-bottom: 30px;
+
     }
+
 
     .card {
+
       background: white;
+
       padding: 25px;
+
       border-radius: 15px;
+
       margin-bottom: 20px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+
+      box-shadow:
+        0 3px 10px
+        rgba(0, 0, 0, 0.08);
+
     }
+
 
     input {
+
       width: 100%;
-      padding: 12px;
+
+      padding: 13px;
+
       margin: 8px 0;
-      border: 1px solid #ccc;
+
+      border:
+        1px solid #ccc;
+
       border-radius: 8px;
+
       font-size: 16px;
+
     }
+
 
     button {
+
       width: 100%;
-      padding: 12px;
+
+      padding: 13px;
+
       margin-top: 10px;
+
       border: none;
+
       border-radius: 8px;
+
       background: #333;
+
       color: white;
+
       font-size: 16px;
+
       cursor: pointer;
+
     }
+
 
     button:hover {
+
       background: #555;
+
     }
 
-    #chatArea {
-      display: none;
+
+    .backButton {
+
+      background: #888;
+
     }
+
+
+    .backButton:hover {
+
+      background: #666;
+
+    }
+
+
+    .room {
+
+      background: #f8f8f8;
+
+      border:
+        1px solid #ddd;
+
+      border-radius: 12px;
+
+      padding: 18px;
+
+      margin-bottom: 15px;
+
+    }
+
+
+    .roomName {
+
+      font-size: 20px;
+
+      font-weight: bold;
+
+      margin-bottom: 8px;
+
+    }
+
+
+    .roomCount {
+
+      color: #666;
+
+      margin-bottom: 10px;
+
+    }
+
+
+    .users {
+
+      padding-left: 10px;
+
+      color: #555;
+
+    }
+
+
+    .users div {
+
+      margin: 4px 0;
+
+    }
+
+
+    .error {
+
+      color: red;
+
+      text-align: center;
+
+      margin: 10px 0;
+
+    }
+
+
+    #nameArea,
+    #menuArea,
+    #createArea,
+    #roomsArea,
+    #chatArea {
+
+      display: none;
+
+    }
+
+
+    #nameArea {
+
+      display: block;
+
+    }
+
 
     #messages {
+
       height: 350px;
+
       overflow-y: auto;
+
       background: #f7f7f7;
+
       padding: 15px;
+
       border-radius: 10px;
+
       margin-bottom: 10px;
+
     }
+
 
     .message {
+
       margin-bottom: 10px;
-      padding: 8px 10px;
+
+      padding: 9px 11px;
+
       background: white;
+
       border-radius: 8px;
+
     }
+
 
     .system {
+
       color: #777;
+
       font-size: 14px;
+
       text-align: center;
+
       margin: 8px;
+
     }
+
 
     #messageInput {
+
       width: 75%;
+
       display: inline-block;
+
     }
+
 
     #sendButton {
+
       width: 23%;
+
       display: inline-block;
+
       margin-left: 1%;
+
     }
 
-    #error {
-      color: red;
-      text-align: center;
-      margin-top: 10px;
-    }
 
-    #roomInfo {
+    #roomTitle {
+
       text-align: center;
-      margin-bottom: 15px;
+
+      font-size: 20px;
+
       font-weight: bold;
+
+      margin-bottom: 15px;
+
     }
+
+
+    .empty {
+
+      text-align: center;
+
+      color: #777;
+
+      padding: 30px;
+
+    }
+
   </style>
+
 </head>
+
 
 <body>
 
+
 <div class="container">
 
-  <h1>チャットしよ</h1>
 
-  <!-- ルーム選択画面 -->
-  <div id="roomArea">
+  <h1>💬 チャッツイヨ</h1>
 
-    <!-- ユーザー名 -->
+
+  <!-- ================= -->
+  <!-- ユーザー名 -->
+  <!-- ================= -->
+
+  <div id="nameArea">
+
     <div class="card">
-      <h2>ユーザー名</h2>
+
+      <h2>ユーザー名を入力</h2>
 
       <input
         id="username"
         type="text"
-        placeholder="あなたの名前"
+        maxlength="20"
+        placeholder="例：たい焼き"
       >
+
+      <button onclick="setUsername()">
+        次へ
+      </button>
+
+      <div
+        id="nameError"
+        class="error"
+      ></div>
+
     </div>
 
-    <!-- ルームを作る -->
+  </div>
+
+
+  <!-- ================= -->
+  <!-- メニュー -->
+  <!-- ================= -->
+
+  <div id="menuArea">
+
     <div class="card">
+
+      <h2 id="welcome"></h2>
+
+      <button onclick="showCreate()">
+        ＋ ルームを作る
+      </button>
+
+      <button onclick="showRooms()">
+        🔍 ルームを探す
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <!-- ================= -->
+  <!-- ルーム作成 -->
+  <!-- ================= -->
+
+  <div id="createArea">
+
+    <div class="card">
+
       <h2>ルームを作る</h2>
 
       <input
         id="createRoomName"
         type="text"
-        placeholder="新しいルーム名"
+        maxlength="30"
+        placeholder="ルーム名"
       >
 
       <button onclick="createRoom()">
-        ルームを作る
+        作成する
       </button>
-    </div>
 
-    <!-- ルームに入る -->
-    <div class="card">
-      <h2>ルームに入る</h2>
-
-      <input
-        id="joinRoomName"
-        type="text"
-        placeholder="入りたいルーム名"
+      <button
+        class="backButton"
+        onclick="showMenu()"
       >
-
-      <button onclick="joinRoom()">
-        このルームに入る
+        戻る
       </button>
-    </div>
 
-    <div id="error"></div>
+      <div
+        id="createError"
+        class="error"
+      ></div>
+
+    </div>
 
   </div>
 
 
-  <!-- チャット画面 -->
+  <!-- ================= -->
+  <!-- ルーム一覧 -->
+  <!-- ================= -->
+
+  <div id="roomsArea">
+
+    <div class="card">
+
+      <h2>現在のルーム</h2>
+
+      <div id="roomList">
+
+        <div class="empty">
+          ルームを読み込んでいます...
+        </div>
+
+      </div>
+
+
+      <button
+        class="backButton"
+        onclick="showMenu()"
+      >
+        戻る
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <!-- ================= -->
+  <!-- チャット -->
+  <!-- ================= -->
+
   <div id="chatArea">
 
     <div class="card">
 
-      <div id="roomInfo"></div>
+      <div id="roomTitle"></div>
 
       <div id="messages"></div>
 
-      <div>
-        <input
-          id="messageInput"
-          type="text"
-          placeholder="メッセージを入力"
-        >
 
-        <button id="sendButton">
-          送信
-        </button>
-      </div>
+      <input
+        id="messageInput"
+        type="text"
+        placeholder="メッセージを入力"
+      >
+
+      <button id="sendButton">
+        送信
+      </button>
 
     </div>
 
   </div>
 
+
 </div>
 
 
-<!-- Socket.IO -->
 <script src="/socket.io/socket.io.js"></script>
+
 
 <script>
 
+
+  // Socket.IO
   const socket = io();
 
+
+  // 現在のユーザー名
   let username = "";
+
+
+  // 現在いるルーム
   let currentRoom = "";
 
 
+  // =========================
+  // ユーザー名
+  // =========================
+
+  function setUsername() {
+
+    const input =
+      document.getElementById("username");
+
+    username =
+      input.value.trim();
+
+
+    if (!username) {
+
+      document.getElementById(
+        "nameError"
+      ).textContent =
+        "ユーザー名を入力してください";
+
+      return;
+
+    }
+
+
+    document.getElementById(
+      "nameError"
+    ).textContent = "";
+
+
+    document.getElementById(
+      "welcome"
+    ).textContent =
+      username + "さん、こんにちは！";
+
+
+    showMenu();
+
+  }
+
+
+  // =========================
+  // 画面切り替え
+  // =========================
+
+  function hideAll() {
+
+    document.getElementById(
+      "nameArea"
+    ).style.display = "none";
+
+    document.getElementById(
+      "menuArea"
+    ).style.display = "none";
+
+    document.getElementById(
+      "createArea"
+    ).style.display = "none";
+
+    document.getElementById(
+      "roomsArea"
+    ).style.display = "none";
+
+    document.getElementById(
+      "chatArea"
+    ).style.display = "none";
+
+  }
+
+
+  function showMenu() {
+
+    hideAll();
+
+    document.getElementById(
+      "menuArea"
+    ).style.display = "block";
+
+  }
+
+
+  function showCreate() {
+
+    hideAll();
+
+    document.getElementById(
+      "createArea"
+    ).style.display = "block";
+
+    document.getElementById(
+      "createRoomName"
+    ).focus();
+
+  }
+
+
+  // =========================
+  // ルーム一覧
+  // =========================
+
+  function showRooms() {
+
+    hideAll();
+
+    document.getElementById(
+      "roomsArea"
+    ).style.display = "block";
+
+
+    socket.emit("getRooms");
+
+  }
+
+
+  // =========================
   // ルームを作る
+  // =========================
+
   function createRoom() {
 
-    username = document.getElementById("username").value.trim();
+    const roomName =
+      document.getElementById(
+        "createRoomName"
+      ).value.trim();
 
-    const room =
-      document.getElementById("createRoomName").value.trim();
 
-    if (!username) {
-      showError("ユーザー名を入力してください");
+    if (!roomName) {
+
+      document.getElementById(
+        "createError"
+      ).textContent =
+        "ルーム名を入力してください";
+
       return;
+
     }
 
-    if (!room) {
-      showError("ルーム名を入力してください");
-      return;
-    }
 
-    socket.emit("createRoom", room);
-
-    currentRoom = room;
-  }
+    document.getElementById(
+      "createError"
+    ).textContent = "";
 
 
-  // ルーム作成成功
-  socket.on("roomCreated", (room) => {
-
-    joinCreatedRoom(room);
-
-  });
-
-
-  // 作ったルームに入る
-  function joinCreatedRoom(room) {
-
-    socket.emit("joinRoom", {
-      username: username,
-      room: room
-    });
-
-  }
-
-
-  // 既存のルームに入る
-  function joinRoom() {
-
-    username = document.getElementById("username").value.trim();
-
-    const room =
-      document.getElementById("joinRoomName").value.trim();
-
-    if (!username) {
-      showError("ユーザー名を入力してください");
-      return;
-    }
-
-    if (!room) {
-      showError("ルーム名を入力してください");
-      return;
-    }
-
-    currentRoom = room;
-
-    socket.emit("joinRoom", {
-      username: username,
-      room: room
-    });
-
-  }
-
-
-// システムメッセージ
-socket.on("systemMessage", (data) => {
-  addSystemMessage(data.message);
-});
-
-
-// 入室成功
-socket.on("roomJoined", (room) => {
-
-  currentRoom = room;
-
-  document.getElementById("roomArea").style.display = "none";
-
-  document.getElementById("chatArea").style.display = "block";
-
-  document.getElementById("roomInfo").textContent =
-    "ルーム：" + room;
-
-  document.getElementById("messageInput").focus();
-});
-
-
-  // チャットメッセージ
-  socket.on("chatMessage", (data) => {
-
-    addMessage(
-      data.username,
-      data.message
+    socket.emit(
+      "createRoom",
+      roomName
     );
 
-  });
+  }
 
 
-  // メッセージを表示
-  function addMessage(name, message) {
+  // =========================
+  // ルーム作成成功
+  // =========================
+
+  socket.on(
+    "roomCreated",
+    (room) => {
+
+      joinRoom(room);
+
+    }
+  );
+
+
+  // =========================
+  // ルームに入る
+  // =========================
+
+  function joinRoom(room) {
+
+    socket.emit(
+      "joinRoom",
+      {
+        username: username,
+        room: room
+      }
+    );
+
+  }
+
+
+  // =========================
+  // ルーム一覧を受信
+  // =========================
+
+  socket.on(
+    "roomList",
+    (rooms) => {
+
+      const list =
+        document.getElementById(
+          "roomList"
+        );
+
+
+      list.innerHTML = "";
+
+
+      if (rooms.length === 0) {
+
+        list.innerHTML = `
+          <div class="empty">
+            現在ルームはありません
+          </div>
+        `;
+
+        return;
+
+      }
+
+
+      rooms.forEach(
+        (room) => {
+
+          const div =
+            document.createElement(
+              "div"
+            );
+
+
+          div.className = "room";
+
+
+          const users =
+            room.users
+              .map(
+                user =>
+                  `<div>👤 ${escapeHtml(user)}</div>`
+              )
+              .join("");
+
+
+          div.innerHTML = `
+
+            <div class="roomName">
+              💬 ${escapeHtml(room.name)}
+            </div>
+
+            <div class="roomCount">
+              参加者：${room.count}人
+            </div>
+
+            <div class="users">
+              ${users}
+            </div>
+
+            <button
+              onclick="joinRoom('${escapeAttribute(room.name)}')"
+            >
+              このルームに入る
+            </button>
+
+          `;
+
+
+          list.appendChild(div);
+
+        }
+      );
+
+    }
+  );
+
+
+  // =========================
+  // 入室成功
+  // =========================
+
+  socket.on(
+    "roomJoined",
+    (room) => {
+
+      currentRoom = room;
+
+
+      hideAll();
+
+
+      document.getElementById(
+        "chatArea"
+      ).style.display = "block";
+
+
+      document.getElementById(
+        "roomTitle"
+      ).textContent =
+        "💬 " + room;
+
+
+      document.getElementById(
+        "messageInput"
+      ).focus();
+
+    }
+  );
+
+
+  // =========================
+  // エラー
+  // =========================
+
+  socket.on(
+    "roomError",
+    (message) => {
+
+      alert(message);
+
+    }
+  );
+
+
+  // =========================
+  // システムメッセージ
+  // =========================
+
+  socket.on(
+    "systemMessage",
+    (data) => {
+
+      addSystemMessage(
+        data.message
+      );
+
+    }
+  );
+
+
+  // =========================
+  // チャット
+  // =========================
+
+  socket.on(
+    "chatMessage",
+    (data) => {
+
+      addMessage(
+        data.username,
+        data.message
+      );
+
+    }
+  );
+
+
+  function addMessage(
+    name,
+    message
+  ) {
 
     const messages =
-      document.getElementById("messages");
+      document.getElementById(
+        "messages"
+      );
+
 
     const div =
-      document.createElement("div");
+      document.createElement(
+        "div"
+      );
 
-    div.className = "message";
+
+    div.className =
+      "message";
+
 
     div.textContent =
       name + "： " + message;
 
+
     messages.appendChild(div);
+
 
     messages.scrollTop =
       messages.scrollHeight;
+
   }
 
 
-  // システムメッセージ
-  function addSystemMessage(message) {
+  function addSystemMessage(
+    message
+  ) {
 
     const messages =
-      document.getElementById("messages");
+      document.getElementById(
+        "messages"
+      );
+
 
     const div =
-      document.createElement("div");
+      document.createElement(
+        "div"
+      );
 
-    div.className = "system";
 
-    div.textContent = message;
+    div.className =
+      "system";
+
+
+    div.textContent =
+      message;
+
 
     messages.appendChild(div);
 
+
     messages.scrollTop =
       messages.scrollHeight;
-  }
-
-
-  // エラー表示
-  socket.on("roomError", (message) => {
-
-    showError(message);
-
-  });
-
-
-  function showError(message) {
-
-    document.getElementById("error").textContent =
-      message;
 
   }
 
 
-  // 送信
-  document
-    .getElementById("sendButton")
-    .addEventListener("click", sendMessage);
-
-
-  // Enterでも送信
-  document
-    .getElementById("messageInput")
-    .addEventListener("keydown", function(event) {
-
-      if (event.key === "Enter") {
-        sendMessage();
-      }
-
-    });
-
+  // =========================
+  // メッセージ送信
+  // =========================
 
   function sendMessage() {
 
     const input =
-      document.getElementById("messageInput");
+      document.getElementById(
+        "messageInput"
+      );
+
 
     const message =
       input.value.trim();
 
-    if (!message) return;
 
-    socket.emit("chatMessage", message);
+    if (!message) {
+      return;
+    }
+
+
+    socket.emit(
+      "chatMessage",
+      message
+    );
+
 
     input.value = "";
+
+
+    input.focus();
+
+  }
+
+
+  document
+    .getElementById(
+      "sendButton"
+    )
+    .addEventListener(
+      "click",
+      sendMessage
+    );
+
+
+  document
+    .getElementById(
+      "messageInput"
+    )
+    .addEventListener(
+      "keydown",
+      (event) => {
+
+        if (
+          event.key === "Enter"
+        ) {
+
+          sendMessage();
+
+        }
+
+      }
+    );
+
+
+  // =========================
+  // HTMLエスケープ
+  // =========================
+
+  function escapeHtml(text) {
+
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+  }
+
+
+  function escapeAttribute(text) {
+
+    return text
+      .replace(/\\/g, "\\\\")
+      .replace(/'/g, "\\'");
 
   }
 
 </script>
 
+
 </body>
+
 </html>
