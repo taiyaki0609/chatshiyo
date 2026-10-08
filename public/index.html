@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>チャットサイト</title>
+</head>
+
+<body>
+  <h1>チャットサイト</h1>
+
+  <div id="chat">
+    <p>チャットサイトへようこそ！</p>
+  </div>
+
+  <input type="text" id="message" placeholder="メッセージを入力">
+  <button onclick="sendMessage()">送信</button>
+
+  <script>
+    function sendMessage() {
+      const input = document.getElementById("message");
+      const chat = document.getElementById("chat");
+
+      if (input.value.trim() === "") return;
+
+      const message = document.createElement("p");
+      message.textContent = "あなた: " + input.value;
+
+      chat.appendChild(message);
+      input.value = "";
+    }
+  </script>
+</body>
+</html>
