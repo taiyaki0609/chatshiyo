@@ -43,8 +43,6 @@ io.on("connection", (socket) => {
         message: `${socket.username}さんが退出しました`
       });
     }
-
-    console.log("ユーザーが切断しました");
   });
 });
 
