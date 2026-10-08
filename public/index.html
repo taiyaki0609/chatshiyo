@@ -104,7 +104,6 @@
 
     <h1>💬 チャッツイヨ</h1>
 
-    <!-- 入室画面 -->
     <div id="loginArea" class="card">
 
       <h2>チャットに入る</h2>
@@ -127,8 +126,6 @@
 
     </div>
 
-
-    <!-- チャット画面 -->
     <div id="chatArea" class="card">
 
       <h2 id="roomTitle"></h2>
@@ -152,7 +149,6 @@
 
   </div>
 
-
   <script src="/socket.io/socket.io.js"></script>
 
   <script>
@@ -168,7 +164,6 @@
 
     const messages = document.getElementById("messages");
     const roomTitle = document.getElementById("roomTitle");
-
 
     function joinRoom() {
 
@@ -193,7 +188,6 @@
       messageInput.focus();
     }
 
-
     function sendMessage() {
 
       const message = messageInput.value.trim();
@@ -205,7 +199,6 @@
       messageInput.value = "";
       messageInput.focus();
     }
-
 
     socket.on("chatMessage", (data) => {
 
@@ -220,7 +213,6 @@
       messages.scrollTop = messages.scrollHeight;
     });
 
-
     socket.on("systemMessage", (data) => {
 
       const div = document.createElement("div");
@@ -233,7 +225,6 @@
 
       messages.scrollTop = messages.scrollHeight;
     });
-
 
     messageInput.addEventListener("keydown", (event) => {
 
