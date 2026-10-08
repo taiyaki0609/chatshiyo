@@ -279,23 +279,26 @@
   }
 
 
-  // 入室成功
-  socket.on("systemMessage", (data) => {
+// システムメッセージ
+socket.on("systemMessage", (data) => {
+  addSystemMessage(data.message);
+});
 
-    addSystemMessage(data.message);
 
-    if (
-      data.message === currentRoom + " に入りました"
-    ) {
-      document.getElementById("roomArea").style.display = "none";
+// 入室成功
+socket.on("roomJoined", (room) => {
 
-      document.getElementById("chatArea").style.display = "block";
+  currentRoom = room;
 
-      document.getElementById("roomInfo").textContent =
-        "ルーム：" + currentRoom;
-    }
+  document.getElementById("roomArea").style.display = "none";
 
-  });
+  document.getElementById("chatArea").style.display = "block";
+
+  document.getElementById("roomInfo").textContent =
+    "ルーム：" + room;
+
+  document.getElementById("messageInput").focus();
+});
 
 
   // チャットメッセージ
