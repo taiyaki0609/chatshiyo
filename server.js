@@ -61,9 +61,11 @@ io.on("connection", (socket) => {
       message: `${username}さんが入室しました`
     });
 
-    socket.emit("systemMessage", {
-      message: `${room} に入りました`
-    });
+socket.emit("roomJoined", room);
+
+socket.emit("systemMessage", {
+  message: `${room} に入りました`
+});
   });
 
   // チャット
