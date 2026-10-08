@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>チャッツイヨ</title>
 
   <style>
@@ -25,37 +26,40 @@
 
     h1 {
       text-align: center;
-      margin-bottom: 25px;
+      margin-bottom: 30px;
     }
 
     .card {
       background: white;
       padding: 25px;
       border-radius: 15px;
-      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.08);
     }
 
     input {
       width: 100%;
       padding: 12px;
-      margin-bottom: 12px;
+      margin: 8px 0;
       border: 1px solid #ccc;
       border-radius: 8px;
       font-size: 16px;
     }
 
     button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
       border: none;
-      padding: 12px 18px;
       border-radius: 8px;
-      background: #222;
+      background: #333;
       color: white;
       font-size: 16px;
       cursor: pointer;
     }
 
     button:hover {
-      opacity: 0.8;
+      background: #555;
     }
 
     #chatArea {
@@ -63,161 +67,340 @@
     }
 
     #messages {
-      height: 400px;
+      height: 350px;
       overflow-y: auto;
       background: #f7f7f7;
       padding: 15px;
       border-radius: 10px;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
     }
 
     .message {
-      background: white;
-      padding: 10px;
       margin-bottom: 10px;
+      padding: 8px 10px;
+      background: white;
       border-radius: 8px;
     }
 
     .system {
       color: #777;
-      text-align: center;
       font-size: 14px;
-      margin-bottom: 10px;
+      text-align: center;
+      margin: 8px;
     }
 
-    .send-area {
-      display: flex;
-      gap: 10px;
+    #messageInput {
+      width: 75%;
+      display: inline-block;
     }
 
-    .send-area input {
-      margin: 0;
-      flex: 1;
+    #sendButton {
+      width: 23%;
+      display: inline-block;
+      margin-left: 1%;
+    }
+
+    #error {
+      color: red;
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    #roomInfo {
+      text-align: center;
+      margin-bottom: 15px;
+      font-weight: bold;
     }
   </style>
 </head>
 
 <body>
 
-  <div class="container">
+<div class="container">
 
-    <h1>💬 チャッツイヨ</h1>
+  <h1>💬 チャッツイヨ</h1>
 
-    <div id="loginArea" class="card">
-      <h2>チャットに入る</h2>
+  <!-- ルーム選択画面 -->
+  <div id="roomArea">
+
+    <!-- ユーザー名 -->
+    <div class="card">
+      <h2>ユーザー名</h2>
 
       <input
-        type="text"
         id="username"
-        placeholder="ユーザー名"
-        maxlength="20"
-      >
-
-      <input
         type="text"
-        id="room"
-        placeholder="ルーム名"
-        maxlength="30"
+        placeholder="あなたの名前"
       >
-
-      <button onclick="joinRoom()">入室する</button>
     </div>
 
-    <div id="chatArea" class="card">
+    <!-- ルームを作る -->
+    <div class="card">
+      <h2>ルームを作る</h2>
 
-      <h2 id="roomTitle"></h2>
+      <input
+        id="createRoomName"
+        type="text"
+        placeholder="新しいルーム名"
+      >
+
+      <button onclick="createRoom()">
+        ルームを作る
+      </button>
+    </div>
+
+    <!-- ルームに入る -->
+    <div class="card">
+      <h2>ルームに入る</h2>
+
+      <input
+        id="joinRoomName"
+        type="text"
+        placeholder="入りたいルーム名"
+      >
+
+      <button onclick="joinRoom()">
+        このルームに入る
+      </button>
+    </div>
+
+    <div id="error"></div>
+
+  </div>
+
+
+  <!-- チャット画面 -->
+  <div id="chatArea">
+
+    <div class="card">
+
+      <div id="roomInfo"></div>
 
       <div id="messages"></div>
 
-      <div class="send-area">
+      <div>
         <input
-          type="text"
           id="messageInput"
+          type="text"
           placeholder="メッセージを入力"
-          maxlength="500"
         >
 
-        <button onclick="sendMessage()">送信</button>
+        <button id="sendButton">
+          送信
+        </button>
       </div>
 
     </div>
 
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+</div>
 
-  <script>
-    const socket = io();
 
-    const loginArea = document.getElementById("loginArea");
-    const chatArea = document.getElementById("chatArea");
+<!-- Socket.IO -->
+<script src="/socket.io/socket.io.js"></script>
 
-    const usernameInput = document.getElementById("username");
-    const roomInput = document.getElementById("room");
-    const messageInput = document.getElementById("messageInput");
+<script>
 
-    const messages = document.getElementById("messages");
-    const roomTitle = document.getElementById("roomTitle");
+  const socket = io();
 
-    function joinRoom() {
-      const username = usernameInput.value.trim();
-      const room = roomInput.value.trim();
+  let username = "";
+  let currentRoom = "";
 
-      if (!username || !room) {
-        alert("ユーザー名とルーム名を入力してください");
-        return;
-      }
 
-      socket.emit("joinRoom", {
-        username: username,
-        room: room
-      });
+  // ルームを作る
+  function createRoom() {
 
-      loginArea.style.display = "none";
-      chatArea.style.display = "block";
+    username = document.getElementById("username").value.trim();
 
-      roomTitle.textContent = "ルーム： " + room;
+    const room =
+      document.getElementById("createRoomName").value.trim();
 
-      messageInput.focus();
+    if (!username) {
+      showError("ユーザー名を入力してください");
+      return;
     }
 
-    function sendMessage() {
-      const message = messageInput.value.trim();
-
-      if (!message) return;
-
-      socket.emit("chatMessage", message);
-
-      messageInput.value = "";
-      messageInput.focus();
+    if (!room) {
+      showError("ルーム名を入力してください");
+      return;
     }
 
-    socket.on("chatMessage", (data) => {
-      const div = document.createElement("div");
+    socket.emit("createRoom", room);
 
-      div.className = "message";
-      div.textContent = data.username + "： " + data.message;
+    currentRoom = room;
+  }
 
-      messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
+
+  // ルーム作成成功
+  socket.on("roomCreated", (room) => {
+
+    joinCreatedRoom(room);
+
+  });
+
+
+  // 作ったルームに入る
+  function joinCreatedRoom(room) {
+
+    socket.emit("joinRoom", {
+      username: username,
+      room: room
     });
 
-    socket.on("systemMessage", (data) => {
-      const div = document.createElement("div");
+  }
 
-      div.className = "system";
-      div.textContent = data.message;
 
-      messages.appendChild(div);
-      messages.scrollTop = messages.scrollHeight;
+  // 既存のルームに入る
+  function joinRoom() {
+
+    username = document.getElementById("username").value.trim();
+
+    const room =
+      document.getElementById("joinRoomName").value.trim();
+
+    if (!username) {
+      showError("ユーザー名を入力してください");
+      return;
+    }
+
+    if (!room) {
+      showError("ルーム名を入力してください");
+      return;
+    }
+
+    currentRoom = room;
+
+    socket.emit("joinRoom", {
+      username: username,
+      room: room
     });
 
-    messageInput.addEventListener("keydown", (event) => {
+  }
+
+
+  // 入室成功
+  socket.on("systemMessage", (data) => {
+
+    addSystemMessage(data.message);
+
+    if (
+      data.message === currentRoom + " に入りました"
+    ) {
+      document.getElementById("roomArea").style.display = "none";
+
+      document.getElementById("chatArea").style.display = "block";
+
+      document.getElementById("roomInfo").textContent =
+        "ルーム：" + currentRoom;
+    }
+
+  });
+
+
+  // チャットメッセージ
+  socket.on("chatMessage", (data) => {
+
+    addMessage(
+      data.username,
+      data.message
+    );
+
+  });
+
+
+  // メッセージを表示
+  function addMessage(name, message) {
+
+    const messages =
+      document.getElementById("messages");
+
+    const div =
+      document.createElement("div");
+
+    div.className = "message";
+
+    div.textContent =
+      name + "： " + message;
+
+    messages.appendChild(div);
+
+    messages.scrollTop =
+      messages.scrollHeight;
+  }
+
+
+  // システムメッセージ
+  function addSystemMessage(message) {
+
+    const messages =
+      document.getElementById("messages");
+
+    const div =
+      document.createElement("div");
+
+    div.className = "system";
+
+    div.textContent = message;
+
+    messages.appendChild(div);
+
+    messages.scrollTop =
+      messages.scrollHeight;
+  }
+
+
+  // エラー表示
+  socket.on("roomError", (message) => {
+
+    showError(message);
+
+  });
+
+
+  function showError(message) {
+
+    document.getElementById("error").textContent =
+      message;
+
+  }
+
+
+  // 送信
+  document
+    .getElementById("sendButton")
+    .addEventListener("click", sendMessage);
+
+
+  // Enterでも送信
+  document
+    .getElementById("messageInput")
+    .addEventListener("keydown", function(event) {
+
       if (event.key === "Enter") {
         sendMessage();
       }
+
     });
-  </script>
+
+
+  function sendMessage() {
+
+    const input =
+      document.getElementById("messageInput");
+
+    const message =
+      input.value.trim();
+
+    if (!message) return;
+
+    socket.emit("chatMessage", message);
+
+    input.value = "";
+
+  }
+
+</script>
 
 </body>
 </html>
