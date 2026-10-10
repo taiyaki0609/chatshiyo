@@ -2,11 +2,17 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 
+const { createClient } = require("@supabase/supabase-js");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
 app.use(express.static("public"));
 
