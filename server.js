@@ -16,7 +16,24 @@ const supabase = createClient(
 
 app.use(express.static("public"));
 
+app.get("/test-supabase", async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from("users")
+      .select("user_id")
+      .limit(1);
 
+    if (error) {
+      console.error("Supabase接続テスト:", error.message);
+      return res.status(500).send("Supabaseへの問い合わせに失敗しました。RenderのLogsを確認してください。");
+    }
+
+    res.send("Supabaseへの問い合わせに成功しました！");
+  } catch (err) {
+    console.error("Supabase接続テスト:", err.message);
+    res.status(500).send("接続テスト中にエラーが発生しました。");
+  }
+});
 // ルームを管理
 // rooms = {
 //   "ゲーム部屋": Map(socket.id → username),
