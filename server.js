@@ -1,13 +1,17 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
-
 const { createClient } = require("@supabase/supabase-js");
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-
 const PORT = process.env.PORT || 3000;
+
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+  console.error("SUPABASE_URL と SUPABASE_ANON_KEY を Render の Environment に設定してください。");
+  process.exit(1);
+}
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -18,319 +22,117 @@ app.use(express.static("public"));
 
 app.get("/test-supabase", async (req, res) => {
   try {
-    const { error } = await supabase
-      .from("users")
-      .select("user_id")
-      .limit(1);
-
+    const { error } = await supabase.from("users").select("user_id").limit(1);
     if (error) {
       console.error("Supabase接続テスト:", error.message);
       return res.status(500).send("Supabaseへの問い合わせに失敗しました。RenderのLogsを確認してください。");
     }
-
     res.send("Supabaseへの問い合わせに成功しました！");
   } catch (err) {
     console.error("Supabase接続テスト:", err.message);
     res.status(500).send("接続テスト中にエラーが発生しました。");
   }
 });
-// ルームを管理
-// rooms = {
-//   "ゲーム部屋": Map(socket.id → username),
-//   "雑談部屋": Map(socket.id → username)
-// }
+
+// Socket.IO の接続ごとに Supabase Auth のトークンを検証する
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth && socket.handshake.auth.token;
+    if (!token) return next(new Error("ログインが必要です。いったんログインし直してください。"));
+
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data.user) {
+      return next(new Error("ログイン情報を確認できません。もう一度ログインしてください。"));
+    }
+
+    socket.authUser = data.user;
+    socket.authUsername =
+      (data.user.user_metadata && data.user.user_metadata.username) ||
+      (data.user.email ? data.user.email.split("@")[0] : "ユーザー");
+    next();
+  } catch (err) {
+    console.error("認証エラー:", err.message);
+    next(new Error("認証中にエラーが発生しました。"));
+  }
+});
+
+// 現在のプロセス内でルームを管理する（サーバー再起動で消える簡易方式）
 const rooms = new Map();
 
+function makeRoomList() {
+  return Array.from(rooms.entries()).map(([name, users]) => ({
+    name,
+    users: Array.from(users.values()),
+    count: users.size
+  }));
+}
+function sendRoomList() {
+  io.emit("roomList", makeRoomList());
+}
+function leaveCurrentRoom(socket, announce = true) {
+  if (!socket.room) return;
+  const oldName = socket.room;
+  const oldRoom = rooms.get(oldName);
+  if (oldRoom) {
+    oldRoom.delete(socket.id);
+    socket.leave(oldName);
+    if (oldRoom.size === 0) rooms.delete(oldName);
+    else if (announce) {
+      socket.to(oldName).emit("systemMessage", {
+        message: `${socket.authUsername}さんが退出しました`
+      });
+    }
+  }
+  socket.room = null;
+  sendRoomList();
+}
 
 io.on("connection", (socket) => {
+  console.log(`ログイン済みユーザーが接続: ${socket.authUsername}`);
 
-  console.log("ユーザーが接続しました");
+  socket.on("createRoom", (rawName) => {
+    const roomName = String(rawName || "").trim().slice(0, 30);
+    if (!roomName) return socket.emit("roomError", "ルーム名を入力してください");
+    if (rooms.has(roomName)) return socket.emit("roomError", "そのルームはすでにあります");
 
-
-  // =========================
-  // ルーム一覧を送る
-  // =========================
-
-  function sendRoomList() {
-
-    const roomList = [];
-
-    for (const [roomName, users] of rooms) {
-
-      roomList.push({
-        name: roomName,
-        users: Array.from(users.values()),
-        count: users.size
-      });
-
-    }
-
-    io.emit("roomList", roomList);
-  }
-
-
-  // =========================
-  // ルームを作る
-  // =========================
-
-  socket.on("createRoom", (roomName) => {
-
-    roomName = roomName.trim();
-
-    if (!roomName) {
-      socket.emit(
-        "roomError",
-        "ルーム名を入力してください"
-      );
-      return;
-    }
-
-
-    // 同じ名前のルームがある
-    if (rooms.has(roomName)) {
-
-      socket.emit(
-        "roomError",
-        "そのルームはすでにあります"
-      );
-
-      return;
-    }
-
-
-    // 新しいルームを作成
-    rooms.set(
-      roomName,
-      new Map()
-    );
-
-
-    console.log(
-      `ルーム作成: ${roomName}`
-    );
-
-
-    // 作成した人に通知
-    socket.emit(
-      "roomCreated",
-      roomName
-    );
-
-
-    // 全員のルーム一覧を更新
+    rooms.set(roomName, new Map());
+    socket.emit("roomCreated", roomName);
     sendRoomList();
-
   });
 
+  socket.on("getRooms", () => sendRoomList());
 
-  // =========================
-  // ルーム一覧を要求
-  // =========================
+  socket.on("joinRoom", (payload) => {
+    const room = String((payload && payload.room) || "").trim();
+    if (!room) return socket.emit("roomError", "ルームを選択してください");
+    if (!rooms.has(room)) return socket.emit("roomError", "そのルームはありません");
 
-  socket.on("getRooms", () => {
-
-    sendRoomList();
-
-  });
-
-
-  // =========================
-  // ルームに入る
-  // =========================
-
-  socket.on("joinRoom", ({ username, room }) => {
-
-    username = username.trim();
-    room = room.trim();
-
-
-    if (!username) {
-
-      socket.emit(
-        "roomError",
-        "ユーザー名を入力してください"
-      );
-
-      return;
-    }
-
-
-    if (!room) {
-
-      socket.emit(
-        "roomError",
-        "ルームを選択してください"
-      );
-
-      return;
-    }
-
-
-    // ルームが存在しない
-    if (!rooms.has(room)) {
-
-      socket.emit(
-        "roomError",
-        "そのルームはありません"
-      );
-
-      return;
-    }
-
-
-    // すでに別のルームにいる場合は退出
-    if (socket.room) {
-
-      const oldRoom = rooms.get(socket.room);
-
-      if (oldRoom) {
-
-        oldRoom.delete(socket.id);
-
-        socket.leave(socket.room);
-
-        if (oldRoom.size === 0) {
-
-          rooms.delete(socket.room);
-
-        }
-
-      }
-
-    }
-
-
-    // 新しいルームに入る
-    socket.username = username;
+    leaveCurrentRoom(socket, true);
     socket.room = room;
-
     socket.join(room);
+    rooms.get(room).set(socket.id, socket.authUsername);
 
-
-    const users = rooms.get(room);
-
-    users.set(
-      socket.id,
-      username
-    );
-
-
-    console.log(
-      `${username} が ${room} に入室`
-    );
-
-
-    // 本人に入室成功を通知
-    socket.emit(
-      "roomJoined",
-      room
-    );
-
-
-    // 同じルームの人に通知
-    socket.to(room).emit(
-      "systemMessage",
-      {
-        message: `${username}さんが入室しました`
-      }
-    );
-
-
-    // 全員のルーム一覧を更新
+    socket.emit("roomJoined", room);
+    socket.to(room).emit("systemMessage", {
+      message: `${socket.authUsername}さんが入室しました`
+    });
     sendRoomList();
-
   });
 
-
-  // =========================
-  // チャット
-  // =========================
-
-  socket.on("chatMessage", (message) => {
-
-    if (!socket.room || !socket.username) {
-      return;
-    }
-
-
-    message = String(message).trim();
-
-    if (!message) {
-      return;
-    }
-
-
-    io.to(socket.room).emit(
-      "chatMessage",
-      {
-        username: socket.username,
-        message: message
-      }
-    );
-
+  socket.on("chatMessage", (rawMessage) => {
+    if (!socket.room || !socket.authUsername) return;
+    const message = String(rawMessage || "").trim().slice(0, 2000);
+    if (!message) return;
+    io.to(socket.room).emit("chatMessage", {
+      username: socket.authUsername,
+      message
+    });
   });
-
-
-  // =========================
-  // 切断
-  // =========================
 
   socket.on("disconnect", () => {
-
-    if (socket.room) {
-
-      const room = rooms.get(
-        socket.room
-      );
-
-
-      if (room) {
-
-        room.delete(socket.id);
-
-
-        // 誰もいなくなったらルームを削除
-        if (room.size === 0) {
-
-          rooms.delete(
-            socket.room
-          );
-
-        }
-        else {
-
-          socket.to(socket.room).emit(
-            "systemMessage",
-            {
-              message:
-                `${socket.username}さんが退出しました`
-            }
-          );
-
-        }
-
-      }
-
-    }
-
-
-    // ルーム一覧を更新
-    sendRoomList();
-
-
-    console.log(
-      "ユーザーが切断しました"
-    );
-
+    leaveCurrentRoom(socket, true);
+    console.log(`切断: ${socket.authUsername}`);
   });
-
 });
 
-
-server.listen(PORT, () => {
-
-  console.log(
-    `Server running on port ${PORT}`
-  );
-
-});
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
