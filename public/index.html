@@ -157,7 +157,8 @@ const { error: profileError } = await supabase
 
 if (profileError) {
   console.error("ユーザー情報の保存に失敗:", profileError);
-  $("welcome").textContent = username + "さん、こんにちは！（プロフィール保存エラー）";
+  $("welcome").textContent =
+    "プロフィール保存エラー: " + profileError.message;
 } else {
   $("welcome").textContent = username + "さん、こんにちは！";
 }
