@@ -1,997 +1,368 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
-
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>チャッツイヨ</title>
-
-
   <style>
-
-    * {
-      box-sizing: border-box;
-    }
-
-
-    body {
-
-      margin: 0;
-
-      font-family:
-        Arial,
-        "Noto Sans JP",
-        sans-serif;
-
-      background: #f2f4f7;
-
-      color: #222;
-
-    }
-
-
-    .container {
-
-      max-width: 700px;
-
-      margin: 40px auto;
-
-      padding: 20px;
-
-    }
-
-
-    h1 {
-
-      text-align: center;
-
-      margin-bottom: 30px;
-
-    }
-
-
-    .card {
-
-      background: white;
-
-      padding: 25px;
-
-      border-radius: 15px;
-
-      margin-bottom: 20px;
-
-      box-shadow:
-        0 3px 10px
-        rgba(0, 0, 0, 0.08);
-
-    }
-
-
-    input {
-
-      width: 100%;
-
-      padding: 13px;
-
-      margin: 8px 0;
-
-      border:
-        1px solid #ccc;
-
-      border-radius: 8px;
-
-      font-size: 16px;
-
-    }
-
-
-    button {
-
-      width: 100%;
-
-      padding: 13px;
-
-      margin-top: 10px;
-
-      border: none;
-
-      border-radius: 8px;
-
-      background: #333;
-
-      color: white;
-
-      font-size: 16px;
-
-      cursor: pointer;
-
-    }
-
-
-    button:hover {
-
-      background: #555;
-
-    }
-
-
-    .backButton {
-
-      background: #888;
-
-    }
-
-
-    .backButton:hover {
-
-      background: #666;
-
-    }
-
-
-    .room {
-
-      background: #f8f8f8;
-
-      border:
-        1px solid #ddd;
-
-      border-radius: 12px;
-
-      padding: 18px;
-
-      margin-bottom: 15px;
-
-    }
-
-
-    .roomName {
-
-      font-size: 20px;
-
-      font-weight: bold;
-
-      margin-bottom: 8px;
-
-    }
-
-
-    .roomCount {
-
-      color: #666;
-
-      margin-bottom: 10px;
-
-    }
-
-
-    .users {
-
-      padding-left: 10px;
-
-      color: #555;
-
-    }
-
-
-    .users div {
-
-      margin: 4px 0;
-
-    }
-
-
-    .error {
-
-      color: red;
-
-      text-align: center;
-
-      margin: 10px 0;
-
-    }
-
-
-    #nameArea,
-    #menuArea,
-    #createArea,
-    #roomsArea,
-    #chatArea {
-
-      display: none;
-
-    }
-
-
-    #nameArea {
-
-      display: block;
-
-    }
-
-
-    #messages {
-
-      height: 350px;
-
-      overflow-y: auto;
-
-      background: #f7f7f7;
-
-      padding: 15px;
-
-      border-radius: 10px;
-
-      margin-bottom: 10px;
-
-    }
-
-
-    .message {
-
-      margin-bottom: 10px;
-
-      padding: 9px 11px;
-
-      background: white;
-
-      border-radius: 8px;
-
-    }
-
-
-    .system {
-
-      color: #777;
-
-      font-size: 14px;
-
-      text-align: center;
-
-      margin: 8px;
-
-    }
-
-
-    #messageInput {
-
-      width: 75%;
-
-      display: inline-block;
-
-    }
-
-
-    #sendButton {
-
-      width: 23%;
-
-      display: inline-block;
-
-      margin-left: 1%;
-
-    }
-
-
-    #roomTitle {
-
-      text-align: center;
-
-      font-size: 20px;
-
-      font-weight: bold;
-
-      margin-bottom: 15px;
-
-    }
-
-
-    .empty {
-
-      text-align: center;
-
-      color: #777;
-
-      padding: 30px;
-
-    }
-
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,"Noto Sans JP",sans-serif;background:#f2f4f7;color:#222}
+    .container{max-width:700px;margin:30px auto;padding:16px}
+    h1{text-align:center;margin-bottom:24px}
+    .card{background:#fff;padding:22px;border-radius:15px;margin-bottom:18px;box-shadow:0 3px 10px rgba(0,0,0,.08)}
+    input{width:100%;padding:13px;margin:8px 0;border:1px solid #ccc;border-radius:8px;font-size:16px}
+    button{width:100%;padding:13px;margin-top:10px;border:0;border-radius:8px;background:#333;color:#fff;font-size:16px;cursor:pointer}
+    button:hover{background:#555}
+    button:disabled{opacity:.6;cursor:wait}
+    .secondary{background:#888}.secondary:hover{background:#666}
+    .error{color:#c62828;margin:10px 0;white-space:pre-wrap}
+    .notice{color:#176b38;margin:10px 0;white-space:pre-wrap}
+    .room{background:#f8f8f8;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:14px}
+    .roomName{font-size:20px;font-weight:bold;margin-bottom:8px}
+    .roomCount{color:#666;margin-bottom:10px}
+    .users{padding-left:10px;color:#555}
+    .users div{margin:4px 0}
+    #authArea{display:block} #menuArea,#createArea,#roomsArea,#chatArea{display:none}
+    #messages{height:350px;overflow-y:auto;background:#f7f7f7;padding:15px;border-radius:10px;margin-bottom:10px}
+    .message{margin-bottom:10px;padding:9px 11px;background:white;border-radius:8px;overflow-wrap:anywhere}
+    .system{color:#777;font-size:14px;text-align:center;margin:8px}
+    #messageInput{width:75%;display:inline-block}
+    #sendButton{width:23%;display:inline-block;margin-left:1%}
+    #roomTitle{text-align:center;font-size:20px;font-weight:bold;margin-bottom:15px}
+    .empty{text-align:center;color:#777;padding:25px}
+    .small{font-size:13px;color:#666;line-height:1.6}
   </style>
-
 </head>
-
-
 <body>
-
-
 <div class="container">
-
-
   <h1>💬 チャッツイヨ</h1>
 
-
-  <!-- ================= -->
-  <!-- ユーザー名 -->
-  <!-- ================= -->
-
-  <div id="nameArea">
-
+  <section id="authArea">
     <div class="card">
-
-      <h2>ユーザー名を入力</h2>
-
-      <input
-        id="username"
-        type="text"
-        maxlength="20"
-        placeholder="例：たい焼き"
-      >
-
-      <button onclick="setUsername()">
-        次へ
-      </button>
-
-      <div
-        id="nameError"
-        class="error"
-      ></div>
-
-    </div>
-
-  </div>
-
-
-  <!-- ================= -->
-  <!-- メニュー -->
-  <!-- ================= -->
-
-  <div id="menuArea">
-
-    <div class="card">
-
-      <h2 id="welcome"></h2>
-
-      <button onclick="showCreate()">
-        ＋ ルームを作る
-      </button>
-
-      <button onclick="showRooms()">
-        🔍 ルームを探す
-      </button>
-
-    </div>
-
-  </div>
-
-
-  <!-- ================= -->
-  <!-- ルーム作成 -->
-  <!-- ================= -->
-
-  <div id="createArea">
-
-    <div class="card">
-
-      <h2>ルームを作る</h2>
-
-      <input
-        id="createRoomName"
-        type="text"
-        maxlength="30"
-        placeholder="ルーム名"
-      >
-
-      <button onclick="createRoom()">
-        作成する
-      </button>
-
-      <button
-        class="backButton"
-        onclick="showMenu()"
-      >
-        戻る
-      </button>
-
-      <div
-        id="createError"
-        class="error"
-      ></div>
-
-    </div>
-
-  </div>
-
-
-  <!-- ================= -->
-  <!-- ルーム一覧 -->
-  <!-- ================= -->
-
-  <div id="roomsArea">
-
-    <div class="card">
-
-      <h2>現在のルーム</h2>
-
-      <div id="roomList">
-
-        <div class="empty">
-          ルームを読み込んでいます...
-        </div>
-
+      <h2 id="authTitle">ログイン</h2>
+      <p class="small">アカウントを作る場合は「新規登録」に切り替えてください。</p>
+      <div id="signupNameWrap" style="display:none">
+        <label for="signupName">サイトで使うユーザー名</label>
+        <input id="signupName" type="text" maxlength="20" autocomplete="nickname" placeholder="例：たい焼き">
       </div>
-
-
-      <button
-        class="backButton"
-        onclick="showMenu()"
-      >
-        戻る
-      </button>
-
+      <label for="email">メールアドレス</label>
+      <input id="email" type="email" autocomplete="email" placeholder="メールアドレス" required>
+      <label for="password">パスワード</label>
+      <input id="password" type="password" autocomplete="current-password" minlength="6" placeholder="パスワード（6文字以上）" required>
+      <button id="authButton" type="button">ログイン</button>
+      <button id="toggleAuth" class="secondary" type="button">新規登録はこちら</button>
+      <button id="resetPassword" class="secondary" type="button">パスワードを忘れた場合</button>
+      <div id="authError" class="error" role="alert"></div>
+      <div id="authNotice" class="notice" role="status"></div>
     </div>
+  </section>
 
-  </div>
-
-
-  <!-- ================= -->
-  <!-- チャット -->
-  <!-- ================= -->
-
-  <div id="chatArea">
-
+  <section id="menuArea">
     <div class="card">
-
-      <div id="roomTitle"></div>
-
-      <div id="messages"></div>
-
-
-      <input
-        id="messageInput"
-        type="text"
-        placeholder="メッセージを入力"
-      >
-
-      <button id="sendButton">
-        送信
-      </button>
-
+      <h2 id="welcome"></h2>
+      <button id="createButton" type="button">＋ ルームを作る</button>
+      <button id="roomsButton" type="button">🔍 ルームを探す</button>
+      <button id="logoutButton" class="secondary" type="button">ログアウト</button>
+      <div id="socketError" class="error" role="alert"></div>
     </div>
+  </section>
 
-  </div>
+  <section id="createArea">
+    <div class="card">
+      <h2>ルームを作る</h2>
+      <input id="createRoomName" type="text" maxlength="30" placeholder="ルーム名">
+      <button id="createRoomButton" type="button">作成する</button>
+      <button class="secondary backButton" type="button">戻る</button>
+      <div id="createError" class="error"></div>
+    </div>
+  </section>
 
+  <section id="roomsArea">
+    <div class="card">
+      <h2>現在のルーム</h2>
+      <div id="roomList"><div class="empty">ルームを読み込んでいます...</div></div>
+      <button class="secondary backButton" type="button">戻る</button>
+    </div>
+  </section>
 
+  <section id="chatArea">
+    <div class="card">
+      <div id="roomTitle"></div>
+      <div id="messages" aria-live="polite"></div>
+      <input id="messageInput" type="text" maxlength="2000" placeholder="メッセージを入力">
+      <button id="sendButton" type="button">送信</button>
+      <button id="leaveRoomButton" class="secondary" type="button">ルーム一覧へ戻る</button>
+    </div>
+  </section>
 </div>
 
-
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/socket.io/socket.io.js"></script>
-
-
 <script>
+(() => {
+  // Supabase の Project URL と Publishable key を設定してください。
+  const SUPABASE_URL = "https://uepozbzfigudmxaefajz.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_bqtRBoOcc-Lnmaho2ADzUw_sqDKnTh0";
 
-
-  // Socket.IO
-  const socket = io();
-
-
-  // 現在のユーザー名
-  let username = "";
-
-
-  // 現在いるルーム
+  const $ = (id) => document.getElementById(id);
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  const socket = io({ autoConnect: false });
+  let isSignup = false;
   let currentRoom = "";
 
+  function showOnly(id) {
+    ["authArea","menuArea","createArea","roomsArea","chatArea"].forEach((key) => {
+      $(key).style.display = key === id ? "block" : "none";
+    });
+  }
+  function showMenu() {
+    showOnly("menuArea");
+    $("socketError").textContent = "";
+  }
+  function clearAuthMessages() {
+    $("authError").textContent = "";
+    $("authNotice").textContent = "";
+  }
+  function updateAuthMode() {
+    $("authTitle").textContent = isSignup ? "新規登録" : "ログイン";
+    $("authButton").textContent = isSignup ? "アカウントを作成" : "ログイン";
+    $("toggleAuth").textContent = isSignup ? "ログインはこちら" : "新規登録はこちら";
+    $("signupNameWrap").style.display = isSignup ? "block" : "none";
+    $("password").autocomplete = isSignup ? "new-password" : "current-password";
+    clearAuthMessages();
+  }
+  function friendlyAuthError(error) {
+    const msg = error && error.message ? error.message : "不明なエラー";
+    if (/Invalid login credentials/i.test(msg)) return "メールアドレスかパスワードが違います。";
+    if (/already registered/i.test(msg)) return "このメールアドレスは登録済みです。ログインしてください。";
+    if (/Password should be at least/i.test(msg)) return "パスワードは6文字以上にしてください。";
+    if (/Email not confirmed/i.test(msg)) return "メール確認が必要です。受信箱を確認してください。";
+    return "認証に失敗しました: " + msg;
+  }
 
-  // =========================
-  // ユーザー名
-  // =========================
-
-  function setUsername() {
-
-    const input =
-      document.getElementById("username");
-
-    username =
-      input.value.trim();
-
-
-    if (!username) {
-
-      document.getElementById(
-        "nameError"
-      ).textContent =
-        "ユーザー名を入力してください";
-
-      return;
-
-    }
-
-
-    document.getElementById(
-      "nameError"
-    ).textContent = "";
-
-
-    document.getElementById(
-      "welcome"
-    ).textContent =
-      username + "さん、こんにちは！";
-
-
+  async function connectChat(user) {
+    const username = (user.user_metadata && user.user_metadata.username) ||
+      (user.email ? user.email.split("@")[0] : "ユーザー");
+    $("welcome").textContent = username + "さん、こんにちは！";
     showMenu();
 
+    // 接続・再接続のたびに現在のセッションのアクセストークンを渡す
+    socket.auth = async (callback) => {
+      const { data } = await supabase.auth.getSession();
+      callback({ token: data.session ? data.session.access_token : null });
+    };
+    if (!socket.connected) socket.connect();
   }
 
+  $("authButton").addEventListener("click", async () => {
+    clearAuthMessages();
+    const email = $("email").value.trim();
+    const password = $("password").value;
+    const username = $("signupName").value.trim();
 
-  // =========================
-  // 画面切り替え
-  // =========================
+    if (!email || !password) {
+      $("authError").textContent = "メールアドレスとパスワードを入力してください。";
+      return;
+    }
+    if (password.length < 6) {
+      $("authError").textContent = "パスワードは6文字以上にしてください。";
+      return;
+    }
+    if (isSignup && !username) {
+      $("authError").textContent = "サイトで使うユーザー名を入力してください。";
+      return;
+    }
 
-  function hideAll() {
+    $("authButton").disabled = true;
+    try {
+      if (isSignup) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { username } }
+        });
+        if (error) throw error;
+        if (data.session && data.user) {
+          $("authNotice").textContent = "登録できました！ログインします。";
+          await connectChat(data.user);
+        } else {
+          $("authNotice").textContent =
+            "登録リクエストを受け付けました。メール確認が必要な場合は、届いたメールのリンクを開いてからログインしてください。";
+          isSignup = false;
+          updateAuthMode();
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        if (!data.user) throw new Error("ユーザー情報を取得できませんでした。");
+        await connectChat(data.user);
+      }
+    } catch (error) {
+      $("authError").textContent = friendlyAuthError(error);
+    } finally {
+      $("authButton").disabled = false;
+    }
+  });
 
-    document.getElementById(
-      "nameArea"
-    ).style.display = "none";
+  $("toggleAuth").addEventListener("click", () => {
+    isSignup = !isSignup;
+    updateAuthMode();
+  });
 
-    document.getElementById(
-      "menuArea"
-    ).style.display = "none";
+  $("resetPassword").addEventListener("click", async () => {
+    clearAuthMessages();
+    const email = $("email").value.trim();
+    if (!email) {
+      $("authError").textContent = "先にメールアドレスを入力してください。";
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin
+      });
+      if (error) throw error;
+      $("authNotice").textContent = "パスワード再設定の案内を送信しました。メールを確認してください。";
+    } catch (error) {
+      $("authError").textContent = friendlyAuthError(error);
+    }
+  });
 
-    document.getElementById(
-      "createArea"
-    ).style.display = "none";
+  $("logoutButton").addEventListener("click", async () => {
+    socket.disconnect();
+    currentRoom = "";
+    await supabase.auth.signOut();
+    $("password").value = "";
+    showOnly("authArea");
+    $("authNotice").textContent = "ログアウトしました。";
+  });
 
-    document.getElementById(
-      "roomsArea"
-    ).style.display = "none";
-
-    document.getElementById(
-      "chatArea"
-    ).style.display = "none";
-
-  }
-
-
-  function showMenu() {
-
-    hideAll();
-
-    document.getElementById(
-      "menuArea"
-    ).style.display = "block";
-
-  }
-
-
-  function showCreate() {
-
-    hideAll();
-
-    document.getElementById(
-      "createArea"
-    ).style.display = "block";
-
-    document.getElementById(
-      "createRoomName"
-    ).focus();
-
-  }
-
-
-  // =========================
-  // ルーム一覧
-  // =========================
-
-  function showRooms() {
-
-    hideAll();
-
-    document.getElementById(
-      "roomsArea"
-    ).style.display = "block";
-
-
+  $("createButton").addEventListener("click", () => {
+    showOnly("createArea");
+    $("createRoomName").focus();
+  });
+  $("roomsButton").addEventListener("click", () => {
+    showOnly("roomsArea");
     socket.emit("getRooms");
-
-  }
-
-
-  // =========================
-  // ルームを作る
-  // =========================
-
-  function createRoom() {
-
-    const roomName =
-      document.getElementById(
-        "createRoomName"
-      ).value.trim();
-
-
-    if (!roomName) {
-
-      document.getElementById(
-        "createError"
-      ).textContent =
-        "ルーム名を入力してください";
-
+  });
+  document.querySelectorAll(".backButton").forEach((button) => {
+    button.addEventListener("click", showMenu);
+  });
+  $("createRoomButton").addEventListener("click", () => {
+    $("createError").textContent = "";
+    const room = $("createRoomName").value.trim();
+    if (!room) {
+      $("createError").textContent = "ルーム名を入力してください。";
       return;
-
     }
+    socket.emit("createRoom", room);
+  });
 
-
-    document.getElementById(
-      "createError"
-    ).textContent = "";
-
-
-    socket.emit(
-      "createRoom",
-      roomName
-    );
-
-  }
-
-
-  // =========================
-  // ルーム作成成功
-  // =========================
-
-  socket.on(
-    "roomCreated",
-    (room) => {
-
-      joinRoom(room);
-
-    }
-  );
-
-
-  // =========================
-  // ルームに入る
-  // =========================
-
+  socket.on("connect_error", (error) => {
+    $("socketError").textContent = error.message || "チャットサーバーに接続できません。";
+  });
+  socket.on("roomCreated", (room) => joinRoom(room));
   function joinRoom(room) {
-
-    socket.emit(
-      "joinRoom",
-      {
-        username: username,
-        room: room
-      }
-    );
-
+    socket.emit("joinRoom", { room });
   }
 
-
-  // =========================
-  // ルーム一覧を受信
-  // =========================
-
-  socket.on(
-    "roomList",
-    (rooms) => {
-
-      const list =
-        document.getElementById(
-          "roomList"
-        );
-
-
-      list.innerHTML = "";
-
-
-      if (rooms.length === 0) {
-
-        list.innerHTML = `
-          <div class="empty">
-            現在ルームはありません
-          </div>
-        `;
-
-        return;
-
-      }
-
-
-      rooms.forEach(
-        (room) => {
-
-          const div =
-            document.createElement(
-              "div"
-            );
-
-
-          div.className = "room";
-
-
-          const users =
-            room.users
-              .map(
-                user =>
-                  `<div>👤 ${escapeHtml(user)}</div>`
-              )
-              .join("");
-
-
-          div.innerHTML = `
-
-            <div class="roomName">
-              💬 ${escapeHtml(room.name)}
-            </div>
-
-            <div class="roomCount">
-              参加者：${room.count}人
-            </div>
-
-            <div class="users">
-              ${users}
-            </div>
-
-            <button
-              onclick="joinRoom('${escapeAttribute(room.name)}')"
-            >
-              このルームに入る
-            </button>
-
-          `;
-
-
-          list.appendChild(div);
-
-        }
-      );
-
-    }
-  );
-
-
-  // =========================
-  // 入室成功
-  // =========================
-
-  socket.on(
-    "roomJoined",
-    (room) => {
-
-      currentRoom = room;
-
-
-      hideAll();
-
-
-      document.getElementById(
-        "chatArea"
-      ).style.display = "block";
-
-
-      document.getElementById(
-        "roomTitle"
-      ).textContent =
-        "💬 " + room;
-
-
-      document.getElementById(
-        "messageInput"
-      ).focus();
-
-    }
-  );
-
-
-  // =========================
-  // エラー
-  // =========================
-
-  socket.on(
-    "roomError",
-    (message) => {
-
-      alert(message);
-
-    }
-  );
-
-
-  // =========================
-  // システムメッセージ
-  // =========================
-
-  socket.on(
-    "systemMessage",
-    (data) => {
-
-      addSystemMessage(
-        data.message
-      );
-
-    }
-  );
-
-
-  // =========================
-  // チャット
-  // =========================
-
-  socket.on(
-    "chatMessage",
-    (data) => {
-
-      addMessage(
-        data.username,
-        data.message
-      );
-
-    }
-  );
-
-
-  function addMessage(
-    name,
-    message
-  ) {
-
-    const messages =
-      document.getElementById(
-        "messages"
-      );
-
-
-    const div =
-      document.createElement(
-        "div"
-      );
-
-
-    div.className =
-      "message";
-
-
-    div.textContent =
-      name + "： " + message;
-
-
-    messages.appendChild(div);
-
-
-    messages.scrollTop =
-      messages.scrollHeight;
-
-  }
-
-
-  function addSystemMessage(
-    message
-  ) {
-
-    const messages =
-      document.getElementById(
-        "messages"
-      );
-
-
-    const div =
-      document.createElement(
-        "div"
-      );
-
-
-    div.className =
-      "system";
-
-
-    div.textContent =
-      message;
-
-
-    messages.appendChild(div);
-
-
-    messages.scrollTop =
-      messages.scrollHeight;
-
-  }
-
-
-  // =========================
-  // メッセージ送信
-  // =========================
-
-  function sendMessage() {
-
-    const input =
-      document.getElementById(
-        "messageInput"
-      );
-
-
-    const message =
-      input.value.trim();
-
-
-    if (!message) {
+  socket.on("roomList", (rooms) => {
+    const list = $("roomList");
+    list.replaceChildren();
+    if (!rooms.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "現在ルームはありません";
+      list.appendChild(empty);
       return;
     }
+    rooms.forEach((room) => {
+      const card = document.createElement("div");
+      card.className = "room";
+      const title = document.createElement("div");
+      title.className = "roomName";
+      title.textContent = "💬 " + room.name;
+      const count = document.createElement("div");
+      count.className = "roomCount";
+      count.textContent = "参加者：" + room.count + "人";
+      const users = document.createElement("div");
+      users.className = "users";
+      room.users.forEach((name) => {
+        const item = document.createElement("div");
+        item.textContent = "👤 " + name;
+        users.appendChild(item);
+      });
+      const button = document.createElement("button");
+      button.textContent = "このルームに入る";
+      button.addEventListener("click", () => joinRoom(room.name));
+      card.append(title, count, users, button);
+      list.appendChild(card);
+    });
+  });
 
+  socket.on("roomJoined", (room) => {
+    currentRoom = room;
+    $("roomTitle").textContent = "💬 " + room;
+    $("messages").replaceChildren();
+    showOnly("chatArea");
+    $("messageInput").focus();
+  });
+  socket.on("roomError", (message) => alert(message));
+  socket.on("systemMessage", (data) => addSystemMessage(data.message));
+  socket.on("chatMessage", (data) => addMessage(data.username, data.message));
 
-    socket.emit(
-      "chatMessage",
-      message
-    );
-
-
+  function addMessage(name, message) {
+    const div = document.createElement("div");
+    div.className = "message";
+    div.textContent = name + "： " + message;
+    $("messages").appendChild(div);
+    $("messages").scrollTop = $("messages").scrollHeight;
+  }
+  function addSystemMessage(message) {
+    const div = document.createElement("div");
+    div.className = "system";
+    div.textContent = message;
+    $("messages").appendChild(div);
+    $("messages").scrollTop = $("messages").scrollHeight;
+  }
+  function sendMessage() {
+    const input = $("messageInput");
+    const message = input.value.trim();
+    if (!message) return;
+    socket.emit("chatMessage", message);
     input.value = "";
-
-
     input.focus();
-
   }
+  $("sendButton").addEventListener("click", sendMessage);
+  $("messageInput").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") sendMessage();
+  });
+  $("leaveRoomButton").addEventListener("click", () => {
+    // 一覧へ戻るためソケットをいったん切断し、再接続する
+    socket.disconnect();
+    currentRoom = "";
+    showOnly("menuArea");
+    socket.connect();
+  });
 
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" && session && !socket.connected) {
+      connectChat(session.user);
+    }
+  });
 
-  document
-    .getElementById(
-      "sendButton"
-    )
-    .addEventListener(
-      "click",
-      sendMessage
-    );
-
-
-  document
-    .getElementById(
-      "messageInput"
-    )
-    .addEventListener(
-      "keydown",
-      (event) => {
-
-        if (
-          event.key === "Enter"
-        ) {
-
-          sendMessage();
-
-        }
-
-      }
-    );
-
-
-  // =========================
-  // HTMLエスケープ
-  // =========================
-
-  function escapeHtml(text) {
-
-    return text
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-
-  }
-
-
-  function escapeAttribute(text) {
-
-    return text
-      .replace(/\\/g, "\\\\")
-      .replace(/'/g, "\\'");
-
-  }
-
+  (async () => {
+    if (SUPABASE_PUBLISHABLE_KEY.startsWith("sb_publishable_bqtRBoOcc-Lnmaho2ADzUw_sqDKnTh0")) {
+      $("authError").textContent = "セットアップが必要です。index.html 内の SUPABASE_PUBLISHABLE_KEY に、Supabase の Publishable key を設定してください。";
+      return;
+    }
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      $("authError").textContent = friendlyAuthError(error);
+      return;
+    }
+    if (data.session) await connectChat(data.session.user);
+  })();
+})();
 </script>
-
-
 </body>
-
 </html>
