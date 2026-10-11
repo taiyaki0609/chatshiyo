@@ -141,10 +141,29 @@
   }
 
   async function connectChat(user) {
-    const username = (user.user_metadata && user.user_metadata.username) ||
-      (user.email ? user.email.split("@")[0] : "ユーザー");
-    $("welcome").textContent = username + "さん、こんにちは！";
-    showMenu();
+  
+const username = (user.user_metadata && user.user_metadata.username) ||
+  (user.email ? user.email.split("@")[0] : "ユーザー");
+
+const { error: profileError } = await supabase
+  .from("users")
+  .upsert({
+    user_id: user.id,
+    username: username,
+    display_name: username
+  }, {
+    onConflict: "user_id"
+  });
+
+if (profileError) {
+  console.error("ユーザー情報の保存に失敗:", profileError);
+  $("welcome").textContent = username + "さん、こんにちは！（プロフィール保存エラー）";
+} else {
+  $("welcome").textContent = username + "さん、こんにちは！";
+}
+
+showMenu();
+
 
     // 接続・再接続のたびに現在のセッションのアクセストークンを渡す
     socket.auth = async (callback) => {
