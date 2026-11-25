@@ -17,6 +17,8 @@ const roomOwners = new Map();
 const roomBans = new Map();
 const roomSettings = new Map();
 const roomWarnings = new Map();
+// ルームごとのお知らせ
+const roomAnnouncements = new Map();
 
 function defaultRoomSettings() {
   return { password: "", profanityFilter: false, sexualFilter: false, maxWarnings: 3 };
@@ -62,6 +64,7 @@ io.on("connection", (socket) => {
         roomBans.delete(roomName);
         roomSettings.delete(roomName);
         roomWarnings.delete(roomName);
+        roomAnnouncements.delete(roomName);
       } else {
         if (roomOwners.get(roomName) === targetSocket.id) {
           const newOwnerId = users.keys().next().value;
@@ -74,6 +77,7 @@ io.on("connection", (socket) => {
             sexualFilter: settings.sexualFilter,
             maxWarnings: settings.maxWarnings
           });
+          io.to(newOwnerId).emit("announcementOwnerChanged", true);
         }
         if (notice) {
           io.to(roomName).emit("systemMessage", { message: notice });
@@ -100,6 +104,7 @@ io.on("connection", (socket) => {
     roomBans.set(roomName, new Set());
     roomSettings.set(roomName, defaultRoomSettings());
     roomWarnings.set(roomName, new Map());
+    roomAnnouncements.set(roomName, []);
 
     console.log(`ルーム作成: ${roomName}`);
     socket.emit("roomCreated", roomName);
@@ -155,6 +160,68 @@ io.on("connection", (socket) => {
       message: `${username}さんが入室しました`
     });
     sendRoomList();
+  });
+
+  socket.on("getAnnouncements", () => {
+    if (!socket.room) return;
+    socket.emit("announcementData", {
+      announcements: roomAnnouncements.get(socket.room) || [],
+      isOwner: roomOwners.get(socket.room) === socket.id
+    });
+  });
+
+  socket.on("postAnnouncement", (data = {}) => {
+    if (!socket.room || roomOwners.get(socket.room) !== socket.id) {
+      socket.emit("announcementError", "お知らせを投稿できるのはルーム管理者だけです");
+      return;
+    }
+    const text = String(data.text || "").trim();
+    const id = String(data.id || "");
+    if (!text) {
+      socket.emit("announcementError", "お知らせの内容を入力してください");
+      return;
+    }
+    if (text.length > 500) {
+      socket.emit("announcementError", "お知らせは500文字以内にしてください");
+      return;
+    }
+
+    const announcements = roomAnnouncements.get(socket.room) || [];
+    if (id) {
+      const target = announcements.find(item => item.id === id);
+      if (!target) {
+        socket.emit("announcementError", "編集するお知らせが見つかりません");
+        return;
+      }
+      target.text = text;
+      target.updatedAt = Date.now();
+    } else {
+      announcements.unshift({
+        id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
+        text,
+        author: socket.username,
+        createdAt: Date.now()
+      });
+      if (announcements.length > 30) announcements.length = 30;
+    }
+    roomAnnouncements.set(socket.room, announcements);
+    io.to(socket.room).emit("announcementsChanged", announcements);
+    socket.emit("announcementSaved");
+  });
+
+  socket.on("deleteAnnouncement", (id) => {
+    if (!socket.room || roomOwners.get(socket.room) !== socket.id) {
+      socket.emit("announcementError", "お知らせを削除できるのはルーム管理者だけです");
+      return;
+    }
+    const announcements = roomAnnouncements.get(socket.room) || [];
+    const next = announcements.filter(item => item.id !== String(id));
+    if (next.length === announcements.length) {
+      socket.emit("announcementError", "削除するお知らせが見つかりません");
+      return;
+    }
+    roomAnnouncements.set(socket.room, next);
+    io.to(socket.room).emit("announcementsChanged", next);
   });
 
   socket.on("getRoomSettings", () => {
@@ -328,8 +395,19 @@ io.on("connection", (socket) => {
         roomBans.delete(socket.room);
         roomSettings.delete(socket.room);
         roomWarnings.delete(socket.room);
+        roomAnnouncements.delete(socket.room);
       } else if (roomOwners.get(socket.room) && !users.has(roomOwners.get(socket.room))) {
         roomOwners.set(socket.room, users.keys().next().value);
+        const newOwnerId = roomOwners.get(socket.room);
+        io.to(newOwnerId).emit("announcementOwnerChanged", true);
+        const settings = roomSettings.get(socket.room) || defaultRoomSettings();
+        io.to(newOwnerId).emit("roomSettingsData", {
+          isOwner: true,
+          passwordEnabled: Boolean(settings.password),
+          profanityFilter: settings.profanityFilter,
+          sexualFilter: settings.sexualFilter,
+          maxWarnings: settings.maxWarnings
+        });
       }
 
       sendRoomList();
