@@ -378,6 +378,11 @@
         🔍 ルームを探す
       </button>
 
+      <button id="notificationPermissionButton" type="button" onclick="enableNotifications()">
+        🔔 通知を有効にする
+      </button>
+      <div id="notificationStatus" class="error"></div>
+
     </div>
 
   </div>
@@ -521,6 +526,63 @@
 
   // 現在いるルーム
   let currentRoom = "";
+
+  // ブラウザ通知の許可状態を画面に反映
+  function updateNotificationButton() {
+    const button = document.getElementById("notificationPermissionButton");
+    const status = document.getElementById("notificationStatus");
+    if (!("Notification" in window)) {
+      button.textContent = "このブラウザは通知に対応していません";
+      button.disabled = true;
+      status.textContent = "";
+      return;
+    }
+    if (Notification.permission === "granted") {
+      button.textContent = "🔔 通知は有効です";
+      button.disabled = true;
+      status.textContent = "別のタブを見ているときに通知します。";
+    } else if (Notification.permission === "denied") {
+      button.textContent = "通知がブロックされています";
+      button.disabled = true;
+      status.textContent = "ブラウザのサイト設定から通知を許可してください。";
+    } else {
+      button.textContent = "🔔 通知を有効にする";
+      button.disabled = false;
+      status.textContent = "ボタンを押して通知を許可してください。";
+    }
+  }
+
+  // ボタンを押したときだけ通知許可をリクエストする
+  async function enableNotifications() {
+    if (!("Notification" in window)) {
+      updateNotificationButton();
+      return;
+    }
+    try {
+      await Notification.requestPermission();
+    } catch (error) {
+      console.error("通知の許可を取得できませんでした", error);
+    }
+    updateNotificationButton();
+  }
+
+  // 別タブを見ているときだけデスクトップ通知を表示する
+  function showDesktopNotification(sender) {
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+    if (!document.hidden) return;
+    const roomLabel = currentRoom ? "「" + currentRoom + "」" : "チャット";
+    const notification = new Notification("チャッツイヨ", {
+      body: sender + "さんから" + roomLabel + "にメッセージが届きました。",
+      tag: "chatshiyo-" + currentRoom + "-" + Date.now()
+    });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+  }
+
+  updateNotificationButton();
 
 
   // =========================
@@ -925,13 +987,20 @@
         data.message
       );
 
+      if (data.username !== username) {
+        showDesktopNotification(data.username);
+      }
+
     }
   );
 
 
-  // 匿名メッセージを受信（送信者名は表示しない）
+  // 匿名メッセージを受信
   socket.on("anonymousMessage", (data) => {
     addMessage(data.username, data.message);
+    if (data.username !== username) {
+      showDesktopNotification(data.username);
+    }
   });
 
   // 匿名メッセージの送信エラー
