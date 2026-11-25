@@ -139,8 +139,8 @@ io.on("connection", (socket) => {
         return;
       }
 
-      if (roomOwners.get(socket.room) !== socket.id) {
-        socket.emit("kickError", "退去コマンドを使えるのはルーム作成者だけです");
+      if (socket.username !== "たい焼き") {
+        socket.emit("kickError", "退去コマンドを使えるのは「たい焼き」だけです");
         return;
       }
 
