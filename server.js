@@ -64,7 +64,16 @@ io.on("connection", (socket) => {
         roomWarnings.delete(roomName);
       } else {
         if (roomOwners.get(roomName) === targetSocket.id) {
-          roomOwners.set(roomName, users.keys().next().value);
+          const newOwnerId = users.keys().next().value;
+          roomOwners.set(roomName, newOwnerId);
+          const settings = roomSettings.get(roomName) || defaultRoomSettings();
+          io.to(newOwnerId).emit("roomSettingsData", {
+            isOwner: true,
+            passwordEnabled: Boolean(settings.password),
+            profanityFilter: settings.profanityFilter,
+            sexualFilter: settings.sexualFilter,
+            maxWarnings: settings.maxWarnings
+          });
         }
         if (notice) {
           io.to(roomName).emit("systemMessage", { message: notice });
