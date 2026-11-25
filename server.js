@@ -16,9 +16,6 @@ const roomOwners = new Map();
 // ルームごとの入室禁止ユーザー名
 const roomBans = new Map();
 
-// 使用できるスタンプID（画像は public/stamps/ に配置）
-const STAMP_IDS = new Set(["thumbs-down"]);
-
 io.on("connection", (socket) => {
   console.log("ユーザーが接続しました");
 
@@ -133,20 +130,6 @@ io.on("connection", (socket) => {
 
     const message = String(rawMessage || "").trim();
     if (!message) return;
-
-    // スタンプ送信（同じルームの全員に配信）
-    if (/^\/stamp\s/i.test(message)) {
-      const stampId = message.slice(6).trim();
-      if (!STAMP_IDS.has(stampId)) {
-        socket.emit("stampError", "スタンプを選び直してください");
-        return;
-      }
-      io.to(socket.room).emit("stampMessage", {
-        username: socket.username,
-        stampId
-      });
-      return;
-    }
 
     // /Anonymous 宛先 メッセージ で、同じルームの相手に匿名メッセージを送る
     if (/^\/anonymous(?:\s|$)/i.test(message)) {
