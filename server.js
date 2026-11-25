@@ -10,304 +10,191 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.static("public"));
 
-
-// ルームを管理
-// rooms = {
-//   "ゲーム部屋": Map(socket.id → username),
-//   "雑談部屋": Map(socket.id → username)
-// }
+// ルームごとの参加者と作成者を管理
 const rooms = new Map();
-
+const roomOwners = new Map();
 
 io.on("connection", (socket) => {
-
   console.log("ユーザーが接続しました");
 
-
-  // =========================
-  // ルーム一覧を送る
-  // =========================
-
   function sendRoomList() {
-
     const roomList = [];
-
     for (const [roomName, users] of rooms) {
-
       roomList.push({
         name: roomName,
         users: Array.from(users.values()),
         count: users.size
       });
-
     }
-
     io.emit("roomList", roomList);
   }
 
+  // ルームから退出させる共通処理
+  function removeFromRoom(targetSocket, notice) {
+    const roomName = targetSocket.room;
+    if (!roomName) return;
 
-  // =========================
-  // ルームを作る
-  // =========================
+    const users = rooms.get(roomName);
+    if (users) {
+      users.delete(targetSocket.id);
+      targetSocket.leave(roomName);
+      targetSocket.room = null;
+
+      if (users.size === 0) {
+        rooms.delete(roomName);
+        roomOwners.delete(roomName);
+      } else {
+        if (roomOwners.get(roomName) === targetSocket.id) {
+          roomOwners.set(roomName, users.keys().next().value);
+        }
+        if (notice) {
+          io.to(roomName).emit("systemMessage", { message: notice });
+        }
+      }
+    }
+    sendRoomList();
+  }
 
   socket.on("createRoom", (roomName) => {
-
-    roomName = roomName.trim();
+    roomName = String(roomName || "").trim();
 
     if (!roomName) {
-      socket.emit(
-        "roomError",
-        "ルーム名を入力してください"
-      );
+      socket.emit("roomError", "ルーム名を入力してください");
       return;
     }
-
-
-    // 同じ名前のルームがある
     if (rooms.has(roomName)) {
-
-      socket.emit(
-        "roomError",
-        "そのルームはすでにあります"
-      );
-
+      socket.emit("roomError", "そのルームはすでにあります");
       return;
     }
 
+    rooms.set(roomName, new Map());
+    roomOwners.set(roomName, socket.id);
 
-    // 新しいルームを作成
-    rooms.set(
-      roomName,
-      new Map()
-    );
-
-
-    console.log(
-      `ルーム作成: ${roomName}`
-    );
-
-
-    // 作成した人に通知
-    socket.emit(
-      "roomCreated",
-      roomName
-    );
-
-
-    // 全員のルーム一覧を更新
+    console.log(`ルーム作成: ${roomName}`);
+    socket.emit("roomCreated", roomName);
     sendRoomList();
-
   });
 
-
-  // =========================
-  // ルーム一覧を要求
-  // =========================
-
-  socket.on("getRooms", () => {
-
-    sendRoomList();
-
-  });
-
-
-  // =========================
-  // ルームに入る
-  // =========================
+  socket.on("getRooms", () => sendRoomList());
 
   socket.on("joinRoom", ({ username, room }) => {
-
-    username = username.trim();
-    room = room.trim();
-
+    username = String(username || "").trim();
+    room = String(room || "").trim();
 
     if (!username) {
-
-      socket.emit(
-        "roomError",
-        "ユーザー名を入力してください"
-      );
-
+      socket.emit("roomError", "ユーザー名を入力してください");
       return;
     }
-
-
     if (!room) {
-
-      socket.emit(
-        "roomError",
-        "ルームを選択してください"
-      );
-
+      socket.emit("roomError", "ルームを選択してください");
       return;
     }
-
-
-    // ルームが存在しない
     if (!rooms.has(room)) {
-
-      socket.emit(
-        "roomError",
-        "そのルームはありません"
-      );
-
+      socket.emit("roomError", "そのルームはありません");
       return;
     }
 
-
-    // すでに別のルームにいる場合は退出
     if (socket.room) {
-
-      const oldRoom = rooms.get(socket.room);
-
-      if (oldRoom) {
-
-        oldRoom.delete(socket.id);
-
-        socket.leave(socket.room);
-
-        if (oldRoom.size === 0) {
-
-          rooms.delete(socket.room);
-
-        }
-
-      }
-
+      removeFromRoom(socket, `${socket.username}さんが退出しました`);
     }
 
-
-    // 新しいルームに入る
     socket.username = username;
     socket.room = room;
-
     socket.join(room);
 
-
     const users = rooms.get(room);
+    users.set(socket.id, username);
 
-    users.set(
-      socket.id,
-      username
-    );
-
-
-    console.log(
-      `${username} が ${room} に入室`
-    );
-
-
-    // 本人に入室成功を通知
-    socket.emit(
-      "roomJoined",
-      room
-    );
-
-
-    // 同じルームの人に通知
-    socket.to(room).emit(
-      "systemMessage",
-      {
-        message: `${username}さんが入室しました`
-      }
-    );
-
-
-    // 全員のルーム一覧を更新
+    console.log(`${username} が ${room} に入室`);
+    socket.emit("roomJoined", room);
+    socket.to(room).emit("systemMessage", {
+      message: `${username}さんが入室しました`
+    });
     sendRoomList();
-
   });
 
+  // /move out 名前 で、ルーム作成者が指定した人を退去させる
+  socket.on("chatMessage", (rawMessage) => {
+    if (!socket.room || !socket.username) return;
 
-  // =========================
-  // チャット
-  // =========================
+    const message = String(rawMessage || "").trim();
+    if (!message) return;
 
-  socket.on("chatMessage", (message) => {
+    if (message.toLowerCase().startsWith("/move out")) {
+      const targetName = message.slice(9).trim();
 
-    if (!socket.room || !socket.username) {
-      return;
-    }
-
-
-    message = String(message).trim();
-
-    if (!message) {
-      return;
-    }
-
-
-    io.to(socket.room).emit(
-      "chatMessage",
-      {
-        username: socket.username,
-        message: message
+      if (!targetName) {
+        socket.emit("kickError", "使い方：/move out ユーザー名");
+        return;
       }
-    );
 
+      if (roomOwners.get(socket.room) !== socket.id) {
+        socket.emit("kickError", "退去コマンドを使えるのはルーム作成者だけです");
+        return;
+      }
+
+      if (targetName === socket.username) {
+        socket.emit("kickError", "自分自身を退去させることはできません");
+        return;
+      }
+
+      const users = rooms.get(socket.room);
+      const targets = users
+        ? Array.from(users.entries()).filter(([id, name]) =>
+            id !== socket.id && name === targetName
+          )
+        : [];
+
+      if (targets.length === 0) {
+        socket.emit("kickError", `「${targetName}」さんはこのルームにいません`);
+        return;
+      }
+
+      // 同じ名前の参加者が複数いる場合は該当者全員を退去
+      for (const [targetId] of targets) {
+        const targetSocket = io.sockets.sockets.get(targetId);
+        if (targetSocket) {
+          targetSocket.emit("kicked", {
+            room: socket.room,
+            message: `ルーム作成者によって「${socket.room}」から退去させられました。`
+          });
+          targetSocket.leave(socket.room);
+          targetSocket.room = null;
+        }
+        users.delete(targetId);
+      }
+
+      io.to(socket.room).emit("systemMessage", {
+        message: `${targetName}さんがルームから退去しました`
+      });
+
+      if (users.size === 0) {
+        rooms.delete(socket.room);
+        roomOwners.delete(socket.room);
+      } else if (roomOwners.get(socket.room) && !users.has(roomOwners.get(socket.room))) {
+        roomOwners.set(socket.room, users.keys().next().value);
+      }
+
+      sendRoomList();
+      return;
+    }
+
+    io.to(socket.room).emit("chatMessage", {
+      username: socket.username,
+      message
+    });
   });
-
-
-  // =========================
-  // 切断
-  // =========================
 
   socket.on("disconnect", () => {
-
     if (socket.room) {
-
-      const room = rooms.get(
-        socket.room
-      );
-
-
-      if (room) {
-
-        room.delete(socket.id);
-
-
-        // 誰もいなくなったらルームを削除
-        if (room.size === 0) {
-
-          rooms.delete(
-            socket.room
-          );
-
-        }
-        else {
-
-          socket.to(socket.room).emit(
-            "systemMessage",
-            {
-              message:
-                `${socket.username}さんが退出しました`
-            }
-          );
-
-        }
-
-      }
-
+      removeFromRoom(socket, `${socket.username}さんが退出しました`);
+    } else {
+      sendRoomList();
     }
-
-
-    // ルーム一覧を更新
-    sendRoomList();
-
-
-    console.log(
-      "ユーザーが切断しました"
-    );
-
+    console.log("ユーザーが切断しました");
   });
-
 });
 
-
 server.listen(PORT, () => {
-
-  console.log(
-    `Server running on port ${PORT}`
-  );
-
+  console.log(`Server running on port ${PORT}`);
 });
