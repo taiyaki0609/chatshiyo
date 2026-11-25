@@ -786,6 +786,18 @@
   );
 
 
+  // 退去されたとき
+  socket.on("kicked", (data) => {
+    currentRoom = "";
+    alert(data.message);
+    showMenu();
+  });
+
+  // 退去コマンドのエラー
+  socket.on("kickError", (message) => {
+    alert(message);
+  });
+
   // =========================
   // エラー
   // =========================
