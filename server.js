@@ -15,6 +15,19 @@ const rooms = new Map();
 const roomOwners = new Map();
 // ルームごとの入室禁止ユーザー名
 const roomBans = new Map();
+const roomSettings = new Map();
+const roomWarnings = new Map();
+
+function defaultRoomSettings() {
+  return { password: "", profanityFilter: false, sexualFilter: false, maxWarnings: 3 };
+}
+const PROFANITY_PATTERNS = [/死ね/i, /消えろ/i, /くたばれ/i, /きもい/i, /キモい/i, /うざい/i, /バカ/i, /ばか/i, /アホ/i, /あほ/i, /クソ/i, /くそ/i];
+const SEXUAL_PATTERNS = [/下ネタ/i, /エロい?/i, /えろい?/i, /セックス/i, /裸になれ/i, /性的/i];
+function blockedCategory(message, settings) {
+  if (settings.profanityFilter && PROFANITY_PATTERNS.some(p => p.test(message))) return "暴言";
+  if (settings.sexualFilter && SEXUAL_PATTERNS.some(p => p.test(message))) return "下ネタ・性的な表現";
+  return "";
+}
 
 io.on("connection", (socket) => {
   console.log("ユーザーが接続しました");
@@ -25,7 +38,8 @@ io.on("connection", (socket) => {
       roomList.push({
         name: roomName,
         users: Array.from(users.values()),
-        count: users.size
+        count: users.size,
+        hasPassword: Boolean(roomSettings.get(roomName)?.password)
       });
     }
     io.emit("roomList", roomList);
@@ -46,6 +60,8 @@ io.on("connection", (socket) => {
         rooms.delete(roomName);
         roomOwners.delete(roomName);
         roomBans.delete(roomName);
+        roomSettings.delete(roomName);
+        roomWarnings.delete(roomName);
       } else {
         if (roomOwners.get(roomName) === targetSocket.id) {
           roomOwners.set(roomName, users.keys().next().value);
@@ -73,6 +89,8 @@ io.on("connection", (socket) => {
     rooms.set(roomName, new Map());
     roomOwners.set(roomName, socket.id);
     roomBans.set(roomName, new Set());
+    roomSettings.set(roomName, defaultRoomSettings());
+    roomWarnings.set(roomName, new Map());
 
     console.log(`ルーム作成: ${roomName}`);
     socket.emit("roomCreated", roomName);
@@ -81,7 +99,7 @@ io.on("connection", (socket) => {
 
   socket.on("getRooms", () => sendRoomList());
 
-  socket.on("joinRoom", ({ username, room }) => {
+  socket.on("joinRoom", ({ username, room, password = "" }) => {
     username = String(username || "").trim();
     room = String(room || "").trim();
 
@@ -95,6 +113,12 @@ io.on("connection", (socket) => {
     }
     if (!rooms.has(room)) {
       socket.emit("roomError", "そのルームはありません");
+      return;
+    }
+
+    const settings = roomSettings.get(room) || defaultRoomSettings();
+    if (settings.password && String(password) !== settings.password) {
+      socket.emit("passwordRequired", room);
       return;
     }
 
@@ -124,6 +148,61 @@ io.on("connection", (socket) => {
     sendRoomList();
   });
 
+  socket.on("getRoomSettings", () => {
+    if (!socket.room) return;
+    const settings = roomSettings.get(socket.room) || defaultRoomSettings();
+    socket.emit("roomSettingsData", {
+      isOwner: roomOwners.get(socket.room) === socket.id,
+      passwordEnabled: Boolean(settings.password),
+      profanityFilter: settings.profanityFilter,
+      sexualFilter: settings.sexualFilter,
+      maxWarnings: settings.maxWarnings
+    });
+  });
+
+  socket.on("setRoomSettings", (data = {}) => {
+    if (!socket.room || roomOwners.get(socket.room) !== socket.id) {
+      socket.emit("roomSettingsError", "ルーム作成者だけが設定を変更できます");
+      return;
+    }
+    const password = String(data.password || "").trim();
+    if (password.length > 32) {
+      socket.emit("roomSettingsError", "パスワードは32文字以内にしてください");
+      return;
+    }
+    const settings = {
+      password,
+      profanityFilter: Boolean(data.profanityFilter),
+      sexualFilter: Boolean(data.sexualFilter),
+      maxWarnings: [1, 2, 3, 5].includes(Number(data.maxWarnings)) ? Number(data.maxWarnings) : 3
+    };
+    roomSettings.set(socket.room, settings);
+    io.to(socket.room).emit("roomSettingsChanged");
+    socket.emit("roomSettingsSaved", { passwordEnabled: Boolean(password) });
+  });
+
+  function moderateMessage(message) {
+    const settings = roomSettings.get(socket.room) || defaultRoomSettings();
+    const category = blockedCategory(message, settings);
+    if (!category) return false;
+    const warnings = roomWarnings.get(socket.room) || new Map();
+    roomWarnings.set(socket.room, warnings);
+    const count = (warnings.get(socket.id) || 0) + 1;
+    warnings.set(socket.id, count);
+    socket.emit("moderationWarning", { category, count, maxWarnings: settings.maxWarnings });
+    if (count >= settings.maxWarnings) {
+      const roomName = socket.room;
+      if (!roomBans.has(roomName)) roomBans.set(roomName, new Set());
+      roomBans.get(roomName).add(socket.username);
+      socket.emit("kicked", {
+        room: roomName,
+        message: "ルームのルールに繰り返し違反したため、このルームから追放されました。"
+      });
+      removeFromRoom(socket, socket.username + "さんがルール違反により追放されました");
+    }
+    return true;
+  }
+
   // /move out 名前 で、ルーム作成者が指定した人を退去させる
   socket.on("chatMessage", (rawMessage) => {
     if (!socket.room || !socket.username) return;
@@ -147,6 +226,7 @@ io.on("connection", (socket) => {
         socket.emit("anonymousError", "宛先のユーザー名とメッセージを入力してください");
         return;
       }
+      if (moderateMessage(anonymousText)) return;
 
       const users = rooms.get(socket.room);
       const targets = users
@@ -237,6 +317,8 @@ io.on("connection", (socket) => {
         rooms.delete(socket.room);
         roomOwners.delete(socket.room);
         roomBans.delete(socket.room);
+        roomSettings.delete(socket.room);
+        roomWarnings.delete(socket.room);
       } else if (roomOwners.get(socket.room) && !users.has(roomOwners.get(socket.room))) {
         roomOwners.set(socket.room, users.keys().next().value);
       }
@@ -244,6 +326,8 @@ io.on("connection", (socket) => {
       sendRoomList();
       return;
     }
+
+    if (moderateMessage(message)) return;
 
     io.to(socket.room).emit("chatMessage", {
       username: socket.username,
