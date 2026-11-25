@@ -13,6 +13,8 @@ app.use(express.static("public"));
 // ルームごとの参加者と作成者を管理
 const rooms = new Map();
 const roomOwners = new Map();
+// ルームごとの入室禁止ユーザー名
+const roomBans = new Map();
 
 io.on("connection", (socket) => {
   console.log("ユーザーが接続しました");
@@ -43,6 +45,7 @@ io.on("connection", (socket) => {
       if (users.size === 0) {
         rooms.delete(roomName);
         roomOwners.delete(roomName);
+        roomBans.delete(roomName);
       } else {
         if (roomOwners.get(roomName) === targetSocket.id) {
           roomOwners.set(roomName, users.keys().next().value);
@@ -69,6 +72,7 @@ io.on("connection", (socket) => {
 
     rooms.set(roomName, new Map());
     roomOwners.set(roomName, socket.id);
+    roomBans.set(roomName, new Set());
 
     console.log(`ルーム作成: ${roomName}`);
     socket.emit("roomCreated", roomName);
@@ -91,6 +95,13 @@ io.on("connection", (socket) => {
     }
     if (!rooms.has(room)) {
       socket.emit("roomError", "そのルームはありません");
+      return;
+    }
+
+    // 退去コマンドで入室禁止になったユーザーは再入室できない
+    const bannedNames = roomBans.get(room);
+    if (bannedNames && bannedNames.has(username)) {
+      socket.emit("roomError", "このルームへの入室は禁止されています");
       return;
     }
 
@@ -150,6 +161,12 @@ io.on("connection", (socket) => {
         return;
       }
 
+      // 退去させたユーザー名を、このルームの入室禁止リストに追加
+      if (!roomBans.has(socket.room)) {
+        roomBans.set(socket.room, new Set());
+      }
+      roomBans.get(socket.room).add(targetName);
+
       // 同じ名前の参加者が複数いる場合は該当者全員を退去
       for (const [targetId] of targets) {
         const targetSocket = io.sockets.sockets.get(targetId);
@@ -171,6 +188,7 @@ io.on("connection", (socket) => {
       if (users.size === 0) {
         rooms.delete(socket.room);
         roomOwners.delete(socket.room);
+        roomBans.delete(socket.room);
       } else if (roomOwners.get(socket.room) && !users.has(roomOwners.get(socket.room))) {
         roomOwners.set(socket.room, users.keys().next().value);
       }
