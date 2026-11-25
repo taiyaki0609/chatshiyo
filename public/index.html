@@ -315,6 +315,40 @@
     }
     .roomLock { color: #9a6a00; font-size: 13px; margin-top: 5px; }
 
+    #announcementBoard {
+      margin: 14px 0;
+      padding: 14px;
+      background: #fffaf0;
+      border: 1px solid #f0d99b;
+      border-radius: 12px;
+    }
+    #announcementBoard h3 { margin: 0 0 10px; }
+    #announcementComposer {
+      display: none;
+      margin: 12px 0;
+      padding: 12px;
+      background: #f4f6fb;
+      border-radius: 10px;
+    }
+    #announcementText {
+      width: 100%;
+      min-height: 90px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    .announcementCard {
+      padding: 11px;
+      margin: 9px 0;
+      background: white;
+      border: 1px solid #eadfca;
+      border-radius: 9px;
+      overflow-wrap: anywhere;
+    }
+    .announcementMeta { color: #777; font-size: 12px; margin-bottom: 7px; }
+    .announcementBody { white-space: pre-wrap; }
+    .announcementActions { display: flex; gap: 7px; margin-top: 8px; }
+    .announcementActions button { width: auto; margin: 0; padding: 7px 11px; }
+
   </style>
 
 </head>
@@ -489,6 +523,23 @@
         <div id="roomSettingsStatus" class="error"></div>
       </div>
 
+      <section id="announcementBoard">
+        <h3>📢 お知らせ</h3>
+        <div id="announcementList">
+          <div class="empty">お知らせを読み込んでいます...</div>
+        </div>
+        <div id="announcementComposer">
+          <h4 id="announcementFormTitle">お知らせを投稿</h4>
+          <textarea id="announcementText" maxlength="500" placeholder="みんなに伝えたいことを入力（500文字以内）"></textarea>
+          <button type="button" onclick="saveAnnouncement()">投稿する</button>
+          <button type="button" class="backButton" onclick="cancelAnnouncementEdit()">キャンセル</button>
+          <div id="announcementStatus" class="error"></div>
+        </div>
+        <button id="announcementNewButton" type="button" onclick="startNewAnnouncement()" style="display:none">
+          ＋ お知らせを投稿
+        </button>
+      </section>
+
       <div id="messages"></div>
 
 
@@ -526,6 +577,8 @@
 
   // 現在いるルーム
   let currentRoom = "";
+  let isRoomOwner = false;
+  let editingAnnouncementId = "";
 
   // ブラウザ通知の許可状態を画面に反映
   function updateNotificationButton() {
@@ -895,6 +948,8 @@
       document.getElementById("roomSettingsPanel").style.display = "none";
       document.getElementById("roomSettingsToggle").style.display = "none";
       socket.emit("getRoomSettings");
+      socket.emit("getAnnouncements");
+      cancelAnnouncementEdit();
 
     }
   );
@@ -907,7 +962,9 @@
   });
 
   socket.on("roomSettingsData", (data) => {
+    isRoomOwner = Boolean(data.isOwner);
     document.getElementById("roomSettingsToggle").style.display = data.isOwner ? "block" : "none";
+    document.getElementById("announcementNewButton").style.display = isRoomOwner ? "block" : "none";
     if (!data.isOwner) return;
     document.getElementById("settingPassword").value = "";
     document.getElementById("settingPassword").placeholder =
@@ -916,6 +973,128 @@
     document.getElementById("settingSexual").checked = data.sexualFilter;
     document.getElementById("settingMaxWarnings").value = String(data.maxWarnings);
   });
+
+  socket.on("announcementOwnerChanged", (isOwner) => {
+    isRoomOwner = Boolean(isOwner);
+    document.getElementById("announcementNewButton").style.display = isRoomOwner ? "block" : "none";
+    if (!isRoomOwner) cancelAnnouncementEdit();
+  });
+
+  socket.on("announcementData", (data) => {
+    isRoomOwner = Boolean(data.isOwner);
+    document.getElementById("announcementNewButton").style.display = isRoomOwner ? "block" : "none";
+    renderAnnouncements(data.announcements || []);
+  });
+
+  socket.on("announcementsChanged", (announcements) => {
+    renderAnnouncements(announcements || []);
+  });
+
+  socket.on("announcementSaved", () => {
+    cancelAnnouncementEdit();
+    document.getElementById("announcementStatus").textContent = "保存しました！";
+  });
+
+  socket.on("announcementError", (message) => {
+    document.getElementById("announcementStatus").textContent = message;
+  });
+
+  socket.on("newAnnouncement", (item) => {
+    if (item.author !== username && document.hidden && "Notification" in window && Notification.permission === "granted") {
+      const notification = new Notification("チャッツイヨ：新しいお知らせ", {
+        body: "「" + currentRoom + "」にお知らせが投稿されました。",
+        tag: "chatshiyo-announcement-" + item.id
+      });
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+    }
+  });
+
+  function renderAnnouncements(items) {
+    const list = document.getElementById("announcementList");
+    list.replaceChildren();
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "まだお知らせはありません";
+      list.appendChild(empty);
+      return;
+    }
+    items.forEach((item) => {
+      const card = document.createElement("article");
+      card.className = "announcementCard";
+
+      const meta = document.createElement("div");
+      meta.className = "announcementMeta";
+      const date = new Date(item.updatedAt || item.createdAt);
+      meta.textContent = "📌 " + item.author + " ・ " + date.toLocaleString("ja-JP") +
+        (item.updatedAt ? "（編集済み）" : "");
+      card.appendChild(meta);
+
+      const body = document.createElement("div");
+      body.className = "announcementBody";
+      body.textContent = item.text;
+      card.appendChild(body);
+
+      if (isRoomOwner) {
+        const actions = document.createElement("div");
+        actions.className = "announcementActions";
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.textContent = "編集";
+        edit.addEventListener("click", () => editAnnouncement(item));
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "削除";
+        remove.addEventListener("click", () => {
+          if (confirm("このお知らせを削除しますか？")) {
+            socket.emit("deleteAnnouncement", item.id);
+          }
+        });
+        actions.append(edit, remove);
+        card.appendChild(actions);
+      }
+      list.appendChild(card);
+    });
+  }
+
+  function startNewAnnouncement() {
+    editingAnnouncementId = "";
+    document.getElementById("announcementFormTitle").textContent = "お知らせを投稿";
+    document.getElementById("announcementText").value = "";
+    document.getElementById("announcementStatus").textContent = "";
+    document.getElementById("announcementComposer").style.display = "block";
+    document.getElementById("announcementText").focus();
+  }
+
+  function editAnnouncement(item) {
+    editingAnnouncementId = item.id;
+    document.getElementById("announcementFormTitle").textContent = "お知らせを編集";
+    document.getElementById("announcementText").value = item.text;
+    document.getElementById("announcementStatus").textContent = "";
+    document.getElementById("announcementComposer").style.display = "block";
+    document.getElementById("announcementText").focus();
+  }
+
+  function cancelAnnouncementEdit() {
+    editingAnnouncementId = "";
+    const composer = document.getElementById("announcementComposer");
+    if (composer) composer.style.display = "none";
+    const input = document.getElementById("announcementText");
+    if (input) input.value = "";
+  }
+
+  function saveAnnouncement() {
+    const text = document.getElementById("announcementText").value.trim();
+    document.getElementById("announcementStatus").textContent = "";
+    if (!text) {
+      document.getElementById("announcementStatus").textContent = "お知らせの内容を入力してください";
+      return;
+    }
+    socket.emit("postAnnouncement", { id: editingAnnouncementId, text });
+  }
 
   socket.on("roomSettingsSaved", (data) => {
     document.getElementById("settingPassword").value = "";
