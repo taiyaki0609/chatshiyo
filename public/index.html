@@ -293,14 +293,27 @@
 
 
     .empty {
-
       text-align: center;
-
       color: #777;
-
       padding: 30px;
-
     }
+
+    #roomSettingsPanel {
+      display: none;
+      margin: 12px 0;
+      padding: 16px;
+      background: #f4f6fb;
+      border: 1px solid #dce2ec;
+      border-radius: 12px;
+    }
+
+    #roomSettingsPanel label { display: block; margin: 12px 0; }
+    #roomSettingsPanel input[type="checkbox"] { width: auto; margin-right: 8px; }
+    #roomSettingsPanel select {
+      width: 100%; padding: 10px; border: 1px solid #ccc;
+      border-radius: 8px; font-size: 16px;
+    }
+    .roomLock { color: #9a6a00; font-size: 13px; margin-top: 5px; }
 
   </style>
 
@@ -448,6 +461,28 @@
     <div class="card">
 
       <div id="roomTitle"></div>
+
+      <button id="roomSettingsToggle" type="button" onclick="toggleRoomSettings()" style="display:none">
+        ⚙️ ルーム設定
+      </button>
+      <div id="roomSettingsPanel">
+        <h3>⚙️ ルーム設定</h3>
+        <label>入室パスワード（空欄で解除）
+          <input id="settingPassword" type="password" maxlength="32" placeholder="パスワードを設定">
+        </label>
+        <label><input id="settingProfanity" type="checkbox"> 暴言フィルターを有効にする</label>
+        <label><input id="settingSexual" type="checkbox"> 下ネタ・性的表現フィルターを有効にする</label>
+        <label>何回警告したら追放する？
+          <select id="settingMaxWarnings">
+            <option value="1">1回（すぐ追放）</option>
+            <option value="2">2回</option>
+            <option value="3" selected>3回</option>
+            <option value="5">5回</option>
+          </select>
+        </label>
+        <button type="button" onclick="saveRoomSettings()">設定を保存</button>
+        <div id="roomSettingsStatus" class="error"></div>
+      </div>
 
       <div id="messages"></div>
 
@@ -657,16 +692,27 @@
   // ルームに入る
   // =========================
 
-  function joinRoom(room) {
+  function joinRoom(room, password = "") {
+    socket.emit("joinRoom", {
+      username: username,
+      room: room,
+      password: password
+    });
+  }
 
-    socket.emit(
-      "joinRoom",
-      {
-        username: username,
-        room: room
-      }
-    );
+  function toggleRoomSettings() {
+    const panel = document.getElementById("roomSettingsPanel");
+    panel.style.display = panel.style.display === "block" ? "none" : "block";
+  }
 
+  function saveRoomSettings() {
+    document.getElementById("roomSettingsStatus").textContent = "";
+    socket.emit("setRoomSettings", {
+      password: document.getElementById("settingPassword").value,
+      profanityFilter: document.getElementById("settingProfanity").checked,
+      sexualFilter: document.getElementById("settingSexual").checked,
+      maxWarnings: Number(document.getElementById("settingMaxWarnings").value)
+    });
   }
 
 
@@ -727,6 +773,8 @@
               💬 ${escapeHtml(room.name)}
             </div>
 
+            ${room.hasPassword ? '<div class="roomLock">🔒 パスワードが必要</div>' : ''}
+
             <div class="roomCount">
               参加者：${room.count}人
             </div>
@@ -782,9 +830,45 @@
         "messageInput"
       ).focus();
 
+      document.getElementById("roomSettingsPanel").style.display = "none";
+      document.getElementById("roomSettingsToggle").style.display = "none";
+      socket.emit("getRoomSettings");
+
     }
   );
 
+
+  socket.on("passwordRequired", (room) => {
+    const password = prompt("このルームのパスワードを入力してください");
+    if (password === null) return;
+    joinRoom(room, password);
+  });
+
+  socket.on("roomSettingsData", (data) => {
+    document.getElementById("roomSettingsToggle").style.display = data.isOwner ? "block" : "none";
+    if (!data.isOwner) return;
+    document.getElementById("settingPassword").value = "";
+    document.getElementById("settingPassword").placeholder =
+      data.passwordEnabled ? "設定済み（変更または空欄で解除）" : "パスワードを設定";
+    document.getElementById("settingProfanity").checked = data.profanityFilter;
+    document.getElementById("settingSexual").checked = data.sexualFilter;
+    document.getElementById("settingMaxWarnings").value = String(data.maxWarnings);
+  });
+
+  socket.on("roomSettingsSaved", (data) => {
+    document.getElementById("settingPassword").value = "";
+    document.getElementById("settingPassword").placeholder =
+      data.passwordEnabled ? "設定済み（変更または空欄で解除）" : "パスワードを設定";
+    document.getElementById("roomSettingsStatus").textContent = "保存しました！";
+  });
+
+  socket.on("roomSettingsError", (message) => {
+    document.getElementById("roomSettingsStatus").textContent = message;
+  });
+
+  socket.on("moderationWarning", (data) => {
+    alert(data.category + "が検知されました。警告 " + data.count + "/" + data.maxWarnings + " 回目です。");
+  });
 
   // 退去されたとき
   socket.on("kicked", (data) => {
