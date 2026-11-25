@@ -172,7 +172,7 @@ io.on("connection", (socket) => {
       }
 
       // 受信者には送信者の名前やIDを渡さない
-      targetSocket.emit("anonymousMessage", { message: anonymousText });
+      targetSocket.emit("anonymousMessage", { username: socket.username, message: anonymousText });
       socket.emit("systemMessage", {
         message: `${targetName}さんに匿名メッセージを送信しました`
       });
