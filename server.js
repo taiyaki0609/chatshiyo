@@ -131,6 +131,54 @@ io.on("connection", (socket) => {
     const message = String(rawMessage || "").trim();
     if (!message) return;
 
+    // /Anonymous 宛先 メッセージ で、同じルームの相手に匿名メッセージを送る
+    if (/^\/anonymous(?:\s|$)/i.test(message)) {
+      const anonymousBody = message.slice(10).trim();
+      const separator = anonymousBody.indexOf(" ");
+      if (separator === -1) {
+        socket.emit("anonymousError", "使い方：/Anonymous ユーザー名 メッセージ");
+        return;
+      }
+
+      const targetName = anonymousBody.slice(0, separator).trim();
+      const anonymousText = anonymousBody.slice(separator + 1).trim();
+
+      if (!targetName || !anonymousText) {
+        socket.emit("anonymousError", "宛先のユーザー名とメッセージを入力してください");
+        return;
+      }
+
+      const users = rooms.get(socket.room);
+      const targets = users
+        ? Array.from(users.entries()).filter(([id, name]) =>
+            id !== socket.id && name === targetName
+          )
+        : [];
+
+      if (targets.length === 0) {
+        socket.emit("anonymousError", `「${targetName}」さんはこのルームにいません`);
+        return;
+      }
+
+      if (targets.length > 1) {
+        socket.emit("anonymousError", `「${targetName}」さんが複数いるため送信できません`);
+        return;
+      }
+
+      const targetSocket = io.sockets.sockets.get(targets[0][0]);
+      if (!targetSocket || targetSocket.room !== socket.room) {
+        socket.emit("anonymousError", "相手がこのルームにいません");
+        return;
+      }
+
+      // 受信者には送信者の名前やIDを渡さない
+      targetSocket.emit("anonymousMessage", { message: anonymousText });
+      socket.emit("systemMessage", {
+        message: `${targetName}さんに匿名メッセージを送信しました`
+      });
+      return;
+    }
+
     if (message.toLowerCase().startsWith("/move out")) {
       const targetName = message.slice(9).trim();
 
