@@ -139,7 +139,7 @@ io.on("connection", (socket) => {
     if (!message) return;
 
     // スタンプ送信（同じルームの全員に配信）
-    if (/^\\/stamp\\s/i.test(message)) {
+    if (/^\/stamp\s/i.test(message)) {
       const stampId = message.slice(6).trim();
       if (!STAMP_IDS.has(stampId)) {
         socket.emit("stampError", "スタンプを選び直してください");
