@@ -187,6 +187,7 @@ io.on("connection", (socket) => {
     }
 
     const announcements = roomAnnouncements.get(socket.room) || [];
+    let postedAnnouncement = null;
     if (id) {
       const target = announcements.find(item => item.id === id);
       if (!target) {
@@ -196,16 +197,18 @@ io.on("connection", (socket) => {
       target.text = text;
       target.updatedAt = Date.now();
     } else {
-      announcements.unshift({
+      postedAnnouncement = {
         id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
         text,
         author: socket.username,
         createdAt: Date.now()
-      });
+      };
+      announcements.unshift(postedAnnouncement);
       if (announcements.length > 30) announcements.length = 30;
     }
     roomAnnouncements.set(socket.room, announcements);
     io.to(socket.room).emit("announcementsChanged", announcements);
+    if (postedAnnouncement) io.to(socket.room).emit("newAnnouncement", postedAnnouncement);
     socket.emit("announcementSaved");
   });
 
