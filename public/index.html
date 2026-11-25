@@ -246,6 +246,78 @@
     }
 
 
+    .stampToolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .stampToggle {
+      width: auto;
+      margin: 0;
+      padding: 10px 14px;
+      background: #6b55c7;
+    }
+
+    #stampPicker {
+      display: none;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 12px;
+      margin: 8px 0;
+      background: #f0edff;
+      border-radius: 12px;
+    }
+
+    .stampChoice {
+      min-width: 0;
+      margin: 0;
+      padding: 8px 4px;
+      color: #222;
+      background: white;
+      border: 1px solid #ddd;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+    }
+
+    .stampChoice:hover { background: #e7e1ff; }
+
+    .stampChoice img {
+      width: 58px;
+      height: 58px;
+      object-fit: contain;
+    }
+
+    .stampFallback {
+      width: 58px;
+      height: 58px;
+      display: grid;
+      place-items: center;
+      font-size: 34px;
+    }
+
+    .stampMessage {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .stampMessage img {
+      width: 104px;
+      height: 104px;
+      object-fit: contain;
+    }
+
+    .stampMessage .stampFallback {
+      width: 104px;
+      height: 104px;
+      font-size: 64px;
+    }
+
     .system {
 
       color: #777;
@@ -451,6 +523,11 @@
 
       <div id="messages"></div>
 
+
+      <div class="stampToolbar">
+        <button class="stampToggle" id="stampToggle" type="button">🎟️ スタンプ</button>
+      </div>
+      <div id="stampPicker" aria-label="スタンプ一覧"></div>
 
       <input
         id="messageInput"
@@ -845,7 +922,16 @@
   );
 
 
-  // 匿名メッセージを受信（送信者名は表示しない）
+  // スタンプを受信
+  socket.on("stampMessage", (data) => {
+    addStampMessage(data.username, data.stampId);
+  });
+
+  socket.on("stampError", (message) => {
+    alert(message);
+  });
+
+  // 匿名メッセージを受信（送信者名を表示）
   socket.on("anonymousMessage", (data) => {
     addMessage(data.username, data.message);
   });
@@ -889,6 +975,83 @@
 
   }
 
+
+  const stampCatalog = [
+    { id: "shelly-happy", name: "シェリー", emoji: "😊" },
+    { id: "colt-laugh", name: "コルト", emoji: "😂" },
+    { id: "spike-love", name: "スパイク", emoji: "❤️" },
+    { id: "surge-cool", name: "サージ", emoji: "😎" },
+    { id: "crow-angry", name: "クロウ", emoji: "😠" },
+    { id: "leon-sleepy", name: "レオン", emoji: "😴" },
+    { id: "dynamike-wow", name: "ダイナマイク", emoji: "😮" },
+    { id: "rico-gg", name: "リコ", emoji: "👍" },
+    { id: "poco-music", name: "ポコ", emoji: "🎵" },
+    { id: "edgar-sad", name: "エドガー", emoji: "😢" },
+    { id: "nita-cry", name: "ニタ", emoji: "😭" },
+    { id: "bo-yes", name: "ボウ", emoji: "🙌" }
+  ];
+
+  function stampImagePath(stampId) {
+    return "/stamps/" + stampId + ".png";
+  }
+
+  function createStampVisual(stamp, className) {
+    const wrapper = document.createElement("div");
+    wrapper.className = className;
+    const image = document.createElement("img");
+    image.src = stampImagePath(stamp.id);
+    image.alt = stamp.name + "のスタンプ";
+    image.onerror = () => {
+      image.remove();
+      const fallback = document.createElement("div");
+      fallback.className = "stampFallback";
+      fallback.textContent = stamp.emoji;
+      wrapper.appendChild(fallback);
+    };
+    wrapper.appendChild(image);
+    return wrapper;
+  }
+
+  function renderStampPicker() {
+    const picker = document.getElementById("stampPicker");
+    picker.innerHTML = "";
+    stampCatalog.forEach((stamp) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "stampChoice";
+      const visual = createStampVisual(stamp, "stampPreview");
+      button.appendChild(visual);
+      const label = document.createElement("span");
+      label.textContent = stamp.name;
+      button.appendChild(label);
+      button.addEventListener("click", () => {
+        socket.emit("chatMessage", "/stamp " + stamp.id);
+        picker.style.display = "none";
+      });
+      picker.appendChild(button);
+    });
+  }
+
+  function addStampMessage(name, stampId) {
+    const stamp = stampCatalog.find(item => item.id === stampId);
+    if (!stamp) return;
+    const messages = document.getElementById("messages");
+    const row = document.createElement("div");
+    row.className = "message";
+    const sender = document.createElement("div");
+    sender.textContent = name + "：";
+    row.appendChild(sender);
+    row.appendChild(createStampVisual(stamp, "stampMessage"));
+    messages.appendChild(row);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  document.getElementById("stampToggle").addEventListener("click", () => {
+    const picker = document.getElementById("stampPicker");
+    picker.style.display = picker.style.display === "grid" ? "none" : "grid";
+  });
+
+  renderStampPicker();
 
   function addSystemMessage(
     message
