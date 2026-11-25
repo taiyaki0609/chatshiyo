@@ -845,6 +845,17 @@
   );
 
 
+  // 匿名メッセージを受信（送信者名は表示しない）
+  socket.on("anonymousMessage", (data) => {
+    addSystemMessage("この人からの匿名メッセージ: " + data.message);
+  });
+
+  // 匿名メッセージの送信エラー
+  socket.on("anonymousError", (message) => {
+    alert(message);
+  });
+
+
   function addMessage(
     name,
     message
