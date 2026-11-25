@@ -17,11 +17,7 @@ const roomOwners = new Map();
 const roomBans = new Map();
 
 // 使用できるスタンプID（画像は public/stamps/ に配置）
-const STAMP_IDS = new Set([
-  "shelly-happy", "colt-laugh", "spike-love", "surge-cool",
-  "crow-angry", "leon-sleepy", "dynamike-wow", "rico-gg",
-  "poco-music", "edgar-sad", "nita-cry", "bo-yes"
-]);
+const STAMP_IDS = new Set(["thumbs-down"]);
 
 io.on("connection", (socket) => {
   console.log("ユーザーが接続しました");
