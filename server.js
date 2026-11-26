@@ -179,10 +179,6 @@ io.on("connection", (socket) => {
   function publicModerationVote(roomName, viewerId) {
     const poll = roomModerationVotes.get(roomName);
     if (!poll) return null;
-    if (poll.votes.size < poll.eligibleIds.size) {
-      socket.emit("moderationVoteError", "全員の投票が終わってから結果を確定してください");
-      return;
-    }
     const counts = { support: 0, oppose: 0, warning: 0 };
     for (const choice of poll.votes.values()) counts[choice]++;
     return {
