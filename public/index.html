@@ -545,17 +545,7 @@
 
       <section id="moderationVoteBoard">
         <h3>⚖️ ルーム管理投票</h3>
-        <button id="moderationVoteStartButton" type="button" onclick="showModerationVoteComposer()" style="display:none">
-          ＋ 追放・厳重注意の投票を開始
-        </button>
-        <div id="moderationVoteComposer">
-          <label>投票の対象者
-            <input id="moderationVoteTarget" type="text" maxlength="30" placeholder="対象者のユーザー名">
-          </label>
-          <button type="button" onclick="startModerationVote()">投票を開始する</button>
-          <button type="button" class="backButton" onclick="cancelModerationVoteComposer()">キャンセル</button>
-          <div id="moderationVoteError" class="error"></div>
-        </div>
+        <div class="voteNotice">オーナーはチャット欄で「/vote ユーザー名」と入力すると投票を開始できます。</div>
         <div id="moderationVoteContent" class="voteNotice">進行中の投票はありません</div>
       </section>
 
@@ -1001,7 +991,6 @@
   socket.on("roomSettingsData", (data) => {
     isRoomOwner = Boolean(data.isOwner);
     document.getElementById("roomSettingsToggle").style.display = data.isOwner ? "block" : "none";
-    document.getElementById("moderationVoteStartButton").style.display = data.isOwner ? "block" : "none";
     document.getElementById("announcementNewButton").style.display = isRoomOwner ? "block" : "none";
     if (!data.isOwner) return;
     document.getElementById("settingPassword").value = "";
@@ -1077,14 +1066,10 @@
 
   function renderModerationVote(data) {
     const content = document.getElementById("moderationVoteContent");
-    const startButton = document.getElementById("moderationVoteStartButton");
-    startButton.style.display = data && data.isOwner ? "block" : "none";
     if (!data) {
       content.textContent = "進行中の投票はありません";
-      document.getElementById("moderationVoteComposer").style.display = "none";
       return;
     }
-    cancelModerationVoteComposer();
     content.replaceChildren();
     const heading = document.createElement("strong");
     heading.textContent = "「" + data.targetName + "」さんについて投票中";
@@ -1446,6 +1431,18 @@
       return;
     }
 
+    // /vote ユーザー名 で、ルームオーナーが管理投票を開始
+    if (/^\/vote(?:\s|$)/i.test(message)) {
+      const targetName = message.slice(5).trim();
+      if (!targetName) {
+        alert("使い方：/vote ユーザー名");
+        return;
+      }
+      socket.emit("startModerationVote", targetName);
+      input.value = "";
+      input.focus();
+      return;
+    }
 
     socket.emit(
       "chatMessage",
