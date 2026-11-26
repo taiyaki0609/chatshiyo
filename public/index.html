@@ -315,6 +315,26 @@
     }
     .roomLock { color: #9a6a00; font-size: 13px; margin-top: 5px; }
 
+    #moderationVoteBoard {
+      margin: 14px 0;
+      padding: 14px;
+      background: #f1f5ff;
+      border: 1px solid #cbd8f3;
+      border-radius: 12px;
+    }
+    #moderationVoteBoard h3 { margin: 0 0 10px; }
+    #moderationVoteComposer {
+      display: none;
+      margin: 10px 0;
+      padding: 12px;
+      background: #fff;
+      border-radius: 10px;
+    }
+    #moderationVoteComposer input { width: 100%; }
+    .voteChoiceButton { margin-top: 8px; }
+    .voteCounts { margin: 10px 0; line-height: 1.8; }
+    .voteNotice { color: #555; font-size: 14px; margin-top: 8px; }
+
     #announcementBoard {
       margin: 14px 0;
       padding: 14px;
@@ -522,6 +542,22 @@
         <button type="button" onclick="saveRoomSettings()">設定を保存</button>
         <div id="roomSettingsStatus" class="error"></div>
       </div>
+
+      <section id="moderationVoteBoard">
+        <h3>⚖️ ルーム管理投票</h3>
+        <button id="moderationVoteStartButton" type="button" onclick="showModerationVoteComposer()" style="display:none">
+          ＋ 追放・厳重注意の投票を開始
+        </button>
+        <div id="moderationVoteComposer">
+          <label>投票の対象者
+            <input id="moderationVoteTarget" type="text" maxlength="30" placeholder="対象者のユーザー名">
+          </label>
+          <button type="button" onclick="startModerationVote()">投票を開始する</button>
+          <button type="button" class="backButton" onclick="cancelModerationVoteComposer()">キャンセル</button>
+          <div id="moderationVoteError" class="error"></div>
+        </div>
+        <div id="moderationVoteContent" class="voteNotice">進行中の投票はありません</div>
+      </section>
 
       <section id="announcementBoard">
         <h3>📢 お知らせ</h3>
@@ -949,6 +985,7 @@
       document.getElementById("roomSettingsToggle").style.display = "none";
       socket.emit("getRoomSettings");
       socket.emit("getAnnouncements");
+      socket.emit("getModerationVote");
       cancelAnnouncementEdit();
 
     }
@@ -964,6 +1001,7 @@
   socket.on("roomSettingsData", (data) => {
     isRoomOwner = Boolean(data.isOwner);
     document.getElementById("roomSettingsToggle").style.display = data.isOwner ? "block" : "none";
+    document.getElementById("moderationVoteStartButton").style.display = data.isOwner ? "block" : "none";
     document.getElementById("announcementNewButton").style.display = isRoomOwner ? "block" : "none";
     if (!data.isOwner) return;
     document.getElementById("settingPassword").value = "";
@@ -973,6 +1011,136 @@
     document.getElementById("settingSexual").checked = data.sexualFilter;
     document.getElementById("settingMaxWarnings").value = String(data.maxWarnings);
   });
+
+  socket.on("moderationVoteChanged", () => {
+    socket.emit("getModerationVote");
+  });
+
+  socket.on("moderationVoteData", (data) => {
+    renderModerationVote(data);
+  });
+
+  socket.on("moderationVoteError", (message) => {
+    document.getElementById("moderationVoteError").textContent = message;
+    alert(message);
+  });
+
+  socket.on("moderationVoteCancelled", (message) => {
+    alert(message);
+    socket.emit("getModerationVote");
+  });
+
+  socket.on("moderationVoteResult", (data) => {
+    const labels = {
+      ban: "賛成が過半数のため、追放になりました。",
+      safe: "反対が過半数のため、今回は追放・厳重注意なしです。",
+      warning: "厳重注意が過半数でした。厳重注意 " + data.warningCount + "/3 回目です。",
+      ban_after_warnings: "厳重注意が3回に達したため、追放になりました。",
+      no_majority: "過半数に達した選択肢がないため、判定保留です。"
+    };
+    alert(data.targetName + "さんの投票結果：\n" + (labels[data.outcome] || "投票が終了しました"));
+    socket.emit("getModerationVote");
+  });
+
+  function showModerationVoteComposer() {
+    if (!isRoomOwner) return;
+    document.getElementById("moderationVoteError").textContent = "";
+    document.getElementById("moderationVoteComposer").style.display = "block";
+    document.getElementById("moderationVoteTarget").focus();
+  }
+
+  function cancelModerationVoteComposer() {
+    document.getElementById("moderationVoteComposer").style.display = "none";
+    document.getElementById("moderationVoteTarget").value = "";
+    document.getElementById("moderationVoteError").textContent = "";
+  }
+
+  function startModerationVote() {
+    const target = document.getElementById("moderationVoteTarget").value.trim();
+    document.getElementById("moderationVoteError").textContent = "";
+    if (!target) {
+      document.getElementById("moderationVoteError").textContent = "対象者のユーザー名を入力してください";
+      return;
+    }
+    socket.emit("startModerationVote", target);
+  }
+
+  function castModerationVote(choice) {
+    socket.emit("castModerationVote", choice);
+  }
+
+  function closeModerationVote() {
+    if (confirm("現在の投票を終了して結果を確定しますか？")) {
+      socket.emit("closeModerationVote");
+    }
+  }
+
+  function renderModerationVote(data) {
+    const content = document.getElementById("moderationVoteContent");
+    const startButton = document.getElementById("moderationVoteStartButton");
+    startButton.style.display = data && data.isOwner ? "block" : "none";
+    if (!data) {
+      content.textContent = "進行中の投票はありません";
+      document.getElementById("moderationVoteComposer").style.display = "none";
+      return;
+    }
+    cancelModerationVoteComposer();
+    content.replaceChildren();
+    const heading = document.createElement("strong");
+    heading.textContent = "「" + data.targetName + "」さんについて投票中";
+    content.appendChild(heading);
+
+    const counts = document.createElement("div");
+    counts.className = "voteCounts";
+    counts.textContent =
+      "賛成：" + data.counts.support + "票 ／ 反対：" + data.counts.oppose +
+      "票 ／ 厳重注意：" + data.counts.warning + "票";
+    content.appendChild(counts);
+
+    const progress = document.createElement("div");
+    progress.className = "voteNotice";
+    progress.textContent = "投票済み " + data.votedCount + " / " + data.eligibleCount +
+      "人（対象者本人は投票できません）";
+    content.appendChild(progress);
+
+    if (data.canVote) {
+      const note = document.createElement("div");
+      note.className = "voteNotice";
+      note.textContent = "あなたの意見を1つ選んでください。投票後の変更はできません。";
+      content.appendChild(note);
+      [
+        ["support", "賛成（追放）"],
+        ["oppose", "反対（追放しない）"],
+        ["warning", "厳重注意"]
+      ].forEach(([value, label]) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "voteChoiceButton";
+        button.textContent = label;
+        button.addEventListener("click", () => castModerationVote(value));
+        content.appendChild(button);
+      });
+    } else if (data.hasVoted) {
+      const note = document.createElement("div");
+      note.className = "voteNotice";
+      note.textContent = "投票済みです。結果が確定するまでお待ちください。";
+      content.appendChild(note);
+    } else {
+      const note = document.createElement("div");
+      note.className = "voteNotice";
+      note.textContent = "この投票には参加できません。";
+      content.appendChild(note);
+    }
+
+    if (data.isOwner) {
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "backButton";
+      close.textContent = "投票を終了して結果を確定";
+      close.addEventListener("click", closeModerationVote);
+      content.appendChild(close);
+    }
+  }
 
   socket.on("announcementOwnerChanged", (isOwner) => {
     isRoomOwner = Boolean(isOwner);
