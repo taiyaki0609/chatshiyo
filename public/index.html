@@ -1010,7 +1010,6 @@
   });
 
   socket.on("moderationVoteError", (message) => {
-    document.getElementById("moderationVoteError").textContent = message;
     alert(message);
   });
 
@@ -1030,29 +1029,6 @@
     alert(data.targetName + "さんの投票結果：\n" + (labels[data.outcome] || "投票が終了しました"));
     socket.emit("getModerationVote");
   });
-
-  function showModerationVoteComposer() {
-    if (!isRoomOwner) return;
-    document.getElementById("moderationVoteError").textContent = "";
-    document.getElementById("moderationVoteComposer").style.display = "block";
-    document.getElementById("moderationVoteTarget").focus();
-  }
-
-  function cancelModerationVoteComposer() {
-    document.getElementById("moderationVoteComposer").style.display = "none";
-    document.getElementById("moderationVoteTarget").value = "";
-    document.getElementById("moderationVoteError").textContent = "";
-  }
-
-  function startModerationVote() {
-    const target = document.getElementById("moderationVoteTarget").value.trim();
-    document.getElementById("moderationVoteError").textContent = "";
-    if (!target) {
-      document.getElementById("moderationVoteError").textContent = "対象者のユーザー名を入力してください";
-      return;
-    }
-    socket.emit("startModerationVote", target);
-  }
 
   function castModerationVote(choice) {
     socket.emit("castModerationVote", choice);
