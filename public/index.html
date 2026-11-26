@@ -1136,7 +1136,10 @@
       const close = document.createElement("button");
       close.type = "button";
       close.className = "backButton";
-      close.textContent = "投票を終了して結果を確定";
+      close.textContent = data.votedCount < data.eligibleCount
+        ? "全員の投票待ち (" + data.votedCount + "/" + data.eligibleCount + ")"
+        : "投票を終了して結果を確定";
+      close.disabled = data.votedCount < data.eligibleCount;
       close.addEventListener("click", closeModerationVote);
       content.appendChild(close);
     }
