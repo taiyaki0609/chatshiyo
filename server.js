@@ -55,6 +55,12 @@ io.on("connection", (socket) => {
     const roomName = targetSocket.room;
     if (!roomName) return;
 
+    const activePoll = roomModerationVotes.get(roomName);
+    if (activePoll && (activePoll.ownerId === targetSocket.id || activePoll.targetId === targetSocket.id)) {
+      roomModerationVotes.delete(roomName);
+      io.to(roomName).emit("moderationVoteCancelled", "投票の開始者または対象者が退出したため、投票を中止しました");
+    }
+
     const users = rooms.get(roomName);
     if (users) {
       users.delete(targetSocket.id);
