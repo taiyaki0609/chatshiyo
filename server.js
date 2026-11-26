@@ -22,6 +22,17 @@ const roomAnnouncements = new Map();
 // ルームごとの管理者投票と厳重注意回数
 const roomModerationVotes = new Map();
 const roomVoteWarnings = new Map();
+const roomChatMessages = new Map();
+
+function broadcastPresence(roomName) {
+  const users = rooms.get(roomName);
+  if (!users) return;
+  const presence = Array.from(users.entries()).map(([id, username]) => {
+    const member = io.sockets.sockets.get(id);
+    return { username, status: member && member.presenceStatus === "away" ? "away" : "online" };
+  });
+  io.to(roomName).emit("roomPresence", presence);
+}
 
 function defaultRoomSettings() {
   return { password: "", profanityFilter: false, sexualFilter: false, maxWarnings: 3 };
@@ -78,6 +89,7 @@ io.on("connection", (socket) => {
         roomAnnouncements.delete(roomName);
         roomModerationVotes.delete(roomName);
         roomVoteWarnings.delete(roomName);
+        roomChatMessages.delete(roomName);
       } else {
         if (roomOwners.get(roomName) === targetSocket.id) {
           const newOwnerId = users.keys().next().value;
@@ -98,6 +110,7 @@ io.on("connection", (socket) => {
       }
     }
     sendRoomList();
+    broadcastPresence(roomName);
   }
 
   socket.on("createRoom", (roomName) => {
@@ -119,13 +132,30 @@ io.on("connection", (socket) => {
     roomWarnings.set(roomName, new Map());
     roomAnnouncements.set(roomName, []);
     roomVoteWarnings.set(roomName, new Map());
+    roomChatMessages.set(roomName, new Map());
 
     console.log(`ルーム作成: ${roomName}`);
     socket.emit("roomCreated", roomName);
     sendRoomList();
+    broadcastPresence(room);
   });
 
   socket.on("getRooms", () => sendRoomList());
+
+  socket.on("presenceUpdate", (status) => {
+    if (!socket.room) return;
+    socket.presenceStatus = status === "away" ? "away" : "online";
+    broadcastPresence(socket.room);
+  });
+
+  socket.on("markMessageRead", (messageId) => {
+    if (!socket.room) return;
+    const messages = roomChatMessages.get(socket.room);
+    const item = messages && messages.get(String(messageId));
+    if (!item || item.username === socket.username || item.readBy.has(socket.id)) return;
+    item.readBy.add(socket.id);
+    io.to(socket.room).emit("messageReadCount", { messageId: item.id, readCount: item.readBy.size });
+  });
 
   socket.on("joinRoom", ({ username, room, password = "" }) => {
     username = String(username || "").trim();
@@ -170,6 +200,7 @@ io.on("connection", (socket) => {
 
     console.log(`${username} が ${room} に入室`);
     socket.emit("roomJoined", room);
+    socket.presenceStatus = "online";
     socket.to(room).emit("systemMessage", {
       message: `${username}さんが入室しました`
     });
@@ -453,7 +484,8 @@ io.on("connection", (socket) => {
   socket.on("chatMessage", (rawMessage) => {
     if (!socket.room || !socket.username) return;
 
-    const message = String(rawMessage || "").trim();
+    const message = String(rawMessage && typeof rawMessage === "object" ? rawMessage.message || "" : rawMessage || "").trim();
+    const replyToId = rawMessage && typeof rawMessage === "object" ? String(rawMessage.replyToId || "") : "";
     if (!message) return;
 
     // /Anonymous 宛先 メッセージ で、同じルームの相手に匿名メッセージを送る
@@ -568,6 +600,7 @@ io.on("connection", (socket) => {
         roomAnnouncements.delete(socket.room);
         roomModerationVotes.delete(socket.room);
         roomVoteWarnings.delete(socket.room);
+        roomChatMessages.delete(socket.room);
       } else if (roomOwners.get(socket.room) && !users.has(roomOwners.get(socket.room))) {
         roomOwners.set(socket.room, users.keys().next().value);
         const newOwnerId = roomOwners.get(socket.room);
@@ -588,10 +621,18 @@ io.on("connection", (socket) => {
 
     if (moderateMessage(message)) return;
 
-    io.to(socket.room).emit("chatMessage", {
-      username: socket.username,
-      message
-    });
+    const messageId = String(Date.now()) + "-" + Math.random().toString(36).slice(2, 9);
+    const storedMessages = roomChatMessages.get(socket.room) || new Map();
+    let replyTo = null;
+    if (replyToId) {
+      const original = storedMessages.get(replyToId);
+      if (original) replyTo = { id: original.id, username: original.username, message: original.message.slice(0, 120) };
+    }
+    const chatItem = { id: messageId, username: socket.username, message, replyTo, readBy: new Set() };
+    storedMessages.set(messageId, chatItem);
+    while (storedMessages.size > 300) storedMessages.delete(storedMessages.keys().next().value);
+    roomChatMessages.set(socket.room, storedMessages);
+    io.to(socket.room).emit("chatMessage", { id: messageId, username: socket.username, message, replyTo });
   });
 
   socket.on("disconnect", () => {
