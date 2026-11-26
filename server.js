@@ -137,7 +137,6 @@ io.on("connection", (socket) => {
     console.log(`ルーム作成: ${roomName}`);
     socket.emit("roomCreated", roomName);
     sendRoomList();
-    broadcastPresence(room);
   });
 
   socket.on("getRooms", () => sendRoomList());
@@ -205,6 +204,7 @@ io.on("connection", (socket) => {
       message: `${username}さんが入室しました`
     });
     sendRoomList();
+    broadcastPresence(room);
   });
 
   function publicModerationVote(roomName, viewerId) {
