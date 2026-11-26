@@ -19,6 +19,9 @@ const roomSettings = new Map();
 const roomWarnings = new Map();
 // ルームごとのお知らせ
 const roomAnnouncements = new Map();
+// ルームごとの管理者投票と厳重注意回数
+const roomModerationVotes = new Map();
+const roomVoteWarnings = new Map();
 
 function defaultRoomSettings() {
   return { password: "", profanityFilter: false, sexualFilter: false, maxWarnings: 3 };
@@ -65,6 +68,8 @@ io.on("connection", (socket) => {
         roomSettings.delete(roomName);
         roomWarnings.delete(roomName);
         roomAnnouncements.delete(roomName);
+        roomModerationVotes.delete(roomName);
+        roomVoteWarnings.delete(roomName);
       } else {
         if (roomOwners.get(roomName) === targetSocket.id) {
           const newOwnerId = users.keys().next().value;
@@ -105,6 +110,7 @@ io.on("connection", (socket) => {
     roomSettings.set(roomName, defaultRoomSettings());
     roomWarnings.set(roomName, new Map());
     roomAnnouncements.set(roomName, []);
+    roomVoteWarnings.set(roomName, new Map());
 
     console.log(`ルーム作成: ${roomName}`);
     socket.emit("roomCreated", roomName);
@@ -160,6 +166,155 @@ io.on("connection", (socket) => {
       message: `${username}さんが入室しました`
     });
     sendRoomList();
+  });
+
+  function publicModerationVote(roomName, viewerId) {
+    const poll = roomModerationVotes.get(roomName);
+    if (!poll) return null;
+    const counts = { support: 0, oppose: 0, warning: 0 };
+    for (const choice of poll.votes.values()) counts[choice]++;
+    return {
+      id: poll.id,
+      targetName: poll.targetName,
+      counts,
+      eligibleCount: poll.eligibleIds.size,
+      votedCount: poll.votes.size,
+      canVote: poll.eligibleIds.has(viewerId) && !poll.votes.has(viewerId),
+      hasVoted: poll.votes.has(viewerId),
+      isOwner: roomOwners.get(roomName) === viewerId
+    };
+  }
+
+  socket.on("getModerationVote", () => {
+    if (!socket.room) return;
+    socket.emit("moderationVoteData", publicModerationVote(socket.room, socket.id));
+  });
+
+  socket.on("startModerationVote", (targetNameRaw) => {
+    const roomName = socket.room;
+    if (!roomName || roomOwners.get(roomName) !== socket.id) {
+      socket.emit("moderationVoteError", "投票を開始できるのはルームオーナーだけです");
+      return;
+    }
+    if (roomModerationVotes.has(roomName)) {
+      socket.emit("moderationVoteError", "すでに進行中の投票があります");
+      return;
+    }
+    const targetName = String(targetNameRaw || "").trim();
+    if (!targetName) {
+      socket.emit("moderationVoteError", "対象者のユーザー名を入力してください");
+      return;
+    }
+    const users = rooms.get(roomName);
+    const targets = users ? Array.from(users.entries()).filter(([id, name]) => name === targetName) : [];
+    if (targets.length === 0) {
+      socket.emit("moderationVoteError", "そのユーザーはこのルームにいません");
+      return;
+    }
+    if (targets.length > 1) {
+      socket.emit("moderationVoteError", "同じ名前の参加者が複数いるため、投票を開始できません");
+      return;
+    }
+    if (targets[0][0] === socket.id) {
+      socket.emit("moderationVoteError", "自分自身を対象にした投票は開始できません");
+      return;
+    }
+    const eligibleIds = new Set(Array.from(users.keys()).filter(id => id !== targets[0][0]));
+    if (eligibleIds.size === 0) {
+      socket.emit("moderationVoteError", "投票できる参加者がいません");
+      return;
+    }
+    roomModerationVotes.set(roomName, {
+      id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
+      targetId: targets[0][0],
+      targetName,
+      ownerId: socket.id,
+      eligibleIds,
+      votes: new Map()
+    });
+    io.to(roomName).emit("moderationVoteChanged");
+    io.to(roomName).emit("systemMessage", { message: targetName + "さんについて、ルームオーナーが管理投票を開始しました" });
+  });
+
+  socket.on("castModerationVote", (choice) => {
+    const roomName = socket.room;
+    const poll = roomName && roomModerationVotes.get(roomName);
+    if (!poll || !poll.eligibleIds.has(socket.id)) {
+      socket.emit("moderationVoteError", "この投票には参加できません");
+      return;
+    }
+    if (poll.votes.has(socket.id)) {
+      socket.emit("moderationVoteError", "投票は1人1回までです");
+      return;
+    }
+    if (!["support", "oppose", "warning"].includes(choice)) {
+      socket.emit("moderationVoteError", "無効な投票です");
+      return;
+    }
+    poll.votes.set(socket.id, choice);
+    io.to(roomName).emit("moderationVoteChanged");
+  });
+
+  socket.on("closeModerationVote", () => {
+    const roomName = socket.room;
+    const poll = roomName && roomModerationVotes.get(roomName);
+    if (!poll || roomOwners.get(roomName) !== socket.id || poll.ownerId !== socket.id) {
+      socket.emit("moderationVoteError", "投票を終了できるのは投票を開始したルームオーナーだけです");
+      return;
+    }
+
+    const counts = { support: 0, oppose: 0, warning: 0 };
+    for (const choice of poll.votes.values()) counts[choice]++;
+    const total = poll.votes.size;
+    let outcome = "no_majority";
+    if (total > 0 && counts.support > total / 2) outcome = "ban";
+    else if (total > 0 && counts.oppose > total / 2) outcome = "safe";
+    else if (total > 0 && counts.warning > total / 2) outcome = "warning";
+
+    roomModerationVotes.delete(roomName);
+    let warningCount = roomVoteWarnings.get(roomName) || new Map();
+    roomVoteWarnings.set(roomName, warningCount);
+    let shouldBan = outcome === "ban";
+    if (outcome === "warning") {
+      const nextCount = (warningCount.get(poll.targetName) || 0) + 1;
+      warningCount.set(poll.targetName, nextCount);
+      if (nextCount >= 3) shouldBan = true;
+      io.to(roomName).emit("moderationVoteResult", {
+        outcome: shouldBan ? "ban_after_warnings" : "warning",
+        targetName: poll.targetName,
+        counts,
+        warningCount: nextCount
+      });
+    } else {
+      io.to(roomName).emit("moderationVoteResult", {
+        outcome,
+        targetName: poll.targetName,
+        counts,
+        warningCount: warningCount.get(poll.targetName) || 0
+      });
+    }
+
+    if (shouldBan) {
+      if (!roomBans.has(roomName)) roomBans.set(roomName, new Set());
+      roomBans.get(roomName).add(poll.targetName);
+      const targetSocket = io.sockets.sockets.get(poll.targetId);
+      if (targetSocket && targetSocket.room === roomName) {
+        targetSocket.emit("kicked", {
+          room: roomName,
+          message: "ルーム内の投票結果により、このルームから追放されました。"
+        });
+        removeFromRoom(targetSocket, poll.targetName + "さんが投票結果により追放されました");
+      }
+    } else if (outcome === "warning") {
+      io.to(roomName).emit("systemMessage", {
+        message: poll.targetName + "さんは厳重注意です（" + warningCount.get(poll.targetName) + "/3回）"
+      });
+    } else if (outcome === "safe") {
+      io.to(roomName).emit("systemMessage", { message: poll.targetName + "さんは今回、追放・厳重注意の対象になりませんでした" });
+    } else {
+      io.to(roomName).emit("systemMessage", { message: "過半数に達した選択肢がないため、今回の投票は判定保留です" });
+    }
+    io.to(roomName).emit("moderationVoteChanged");
   });
 
   socket.on("getAnnouncements", () => {
@@ -399,6 +554,8 @@ io.on("connection", (socket) => {
         roomSettings.delete(socket.room);
         roomWarnings.delete(socket.room);
         roomAnnouncements.delete(socket.room);
+        roomModerationVotes.delete(socket.room);
+        roomVoteWarnings.delete(socket.room);
       } else if (roomOwners.get(socket.room) && !users.has(roomOwners.get(socket.room))) {
         roomOwners.set(socket.room, users.keys().next().value);
         const newOwnerId = roomOwners.get(socket.room);
