@@ -152,7 +152,7 @@ io.on("connection", (socket) => {
     if (!socket.room) return;
     const messages = roomChatMessages.get(socket.room);
     const item = messages && messages.get(String(messageId));
-    if (!item || item.username === socket.username || item.readBy.has(socket.id)) return;
+    if (!item || item.senderId === socket.id || item.readBy.has(socket.id)) return;
     item.readBy.add(socket.id);
     io.to(socket.room).emit("messageReadCount", { messageId: item.id, readCount: item.readBy.size });
   });
@@ -616,6 +616,7 @@ io.on("connection", (socket) => {
       }
 
       sendRoomList();
+      broadcastPresence(socket.room);
       return;
     }
 
@@ -628,7 +629,7 @@ io.on("connection", (socket) => {
       const original = storedMessages.get(replyToId);
       if (original) replyTo = { id: original.id, username: original.username, message: original.message.slice(0, 120) };
     }
-    const chatItem = { id: messageId, username: socket.username, message, replyTo, readBy: new Set() };
+    const chatItem = { id: messageId, senderId: socket.id, username: socket.username, message, replyTo, readBy: new Set() };
     storedMessages.set(messageId, chatItem);
     while (storedMessages.size > 300) storedMessages.delete(storedMessages.keys().next().value);
     roomChatMessages.set(socket.room, storedMessages);
