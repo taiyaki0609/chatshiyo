@@ -368,6 +368,16 @@
     .announcementBody { white-space: pre-wrap; }
     .announcementActions { display: flex; gap: 7px; margin-top: 8px; }
     .announcementActions button { width: auto; margin: 0; padding: 7px 11px; }
+    #roomPresence { margin: 8px 0 14px; padding: 9px 11px; background: #f4f6fb; border-radius: 9px; font-size: 13px; color: #555; }
+    .presenceUser { display: inline-block; margin: 3px 9px 3px 0; }
+    .message { overflow-wrap: anywhere; }
+    .messageReply { padding: 6px 8px; margin-bottom: 7px; background: #f0f2f5; border-left: 3px solid #8294b8; border-radius: 5px; color: #555; font-size: 13px; }
+    .messageText { white-space: pre-wrap; }
+    .messageTools { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px; color: #888; font-size: 12px; }
+    .messageTools button { width: auto; margin: 0; padding: 4px 9px; font-size: 12px; background: #e8edf5; color: #334; }
+    .messageTools button:hover { background: #dbe3ef; }
+    #replyBar { display: none; margin: 8px 0; padding: 9px 11px; background: #eef3ff; border-radius: 8px; font-size: 13px; }
+    #replyBar button { width: auto; margin: 0 0 0 8px; padding: 4px 8px; font-size: 12px; }
 
   </style>
 
@@ -520,6 +530,7 @@
     <div class="card">
 
       <div id="roomTitle"></div>
+      <div id="roomPresence">参加者の状態を読み込んでいます...</div>
 
       <button id="roomSettingsToggle" type="button" onclick="toggleRoomSettings()" style="display:none">
         ⚙️ ルーム設定
@@ -569,6 +580,8 @@
       <div id="messages"></div>
 
 
+      <div id="replyBar"><span id="replyBarText"></span><button type="button" onclick="cancelReply()">返信をやめる</button></div>
+
       <input
         id="messageInput"
         type="text"
@@ -605,6 +618,7 @@
   let currentRoom = "";
   let isRoomOwner = false;
   let editingAnnouncementId = "";
+  let currentReplyTo = null;
 
   // ブラウザ通知の許可状態を画面に反映
   function updateNotificationButton() {
@@ -976,6 +990,8 @@
       socket.emit("getRoomSettings");
       socket.emit("getAnnouncements");
       socket.emit("getModerationVote");
+      socket.emit("presenceUpdate", getPresenceStatus());
+      cancelReply();
       cancelAnnouncementEdit();
 
     }
@@ -999,6 +1015,48 @@
     document.getElementById("settingProfanity").checked = data.profanityFilter;
     document.getElementById("settingSexual").checked = data.sexualFilter;
     document.getElementById("settingMaxWarnings").value = String(data.maxWarnings);
+  });
+
+  socket.on("roomPresence", (users) => {
+    const panel = document.getElementById("roomPresence");
+    panel.replaceChildren();
+    const heading = document.createElement("strong");
+    heading.textContent = "参加者：";
+    panel.appendChild(heading);
+    (users || []).forEach((user) => {
+      const item = document.createElement("span");
+      item.className = "presenceUser";
+      item.textContent = (user.status === "away" ? "🌙 " : "🟢 ") + user.username +
+        (user.status === "away" ? "（離席中）" : "（オンライン）");
+      panel.appendChild(item);
+    });
+  });
+
+  function getPresenceStatus() {
+    return document.hidden || !document.hasFocus() ? "away" : "online";
+  }
+
+  function updatePresence() {
+    if (currentRoom) socket.emit("presenceUpdate", getPresenceStatus());
+    if (!document.hidden && document.hasFocus() && currentRoom) {
+      document.querySelectorAll(".message[data-message-id]").forEach((item) => {
+        if (item.dataset.own !== "true" && item.dataset.readMarked !== "true") {
+          item.dataset.readMarked = "true";
+          socket.emit("markMessageRead", item.dataset.messageId);
+        }
+      });
+    }
+  }
+
+  document.addEventListener("visibilitychange", updatePresence);
+  window.addEventListener("focus", updatePresence);
+  window.addEventListener("blur", updatePresence);
+
+  socket.on("messageReadCount", (data) => {
+    const message = document.querySelector('.message[data-message-id="' + CSS.escape(data.messageId) + '"]');
+    if (!message) return;
+    const read = message.querySelector(".readCount");
+    if (read) read.textContent = "既読 " + data.readCount + "人";
   });
 
   socket.on("moderationVoteChanged", () => {
@@ -1292,16 +1350,11 @@
   socket.on(
     "chatMessage",
     (data) => {
-
-      addMessage(
-        data.username,
-        data.message
-      );
-
+      addMessage(data.username, data.message, data);
       if (data.username !== username) {
+        if (!document.hidden && document.hasFocus() && data.id) socket.emit("markMessageRead", data.id);
         showDesktopNotification(data.username);
       }
-
     }
   );
 
@@ -1320,37 +1373,57 @@
   });
 
 
-  function addMessage(
-    name,
-    message
-  ) {
+  function addMessage(name, message, meta = {}) {
+    const messages = document.getElementById("messages");
+    const div = document.createElement("div");
+    div.className = "message";
+    if (meta.id) {
+      div.dataset.messageId = meta.id;
+      div.dataset.own = String(name === username);
+    }
 
-    const messages =
-      document.getElementById(
-        "messages"
-      );
+    if (meta.replyTo) {
+      const quote = document.createElement("div");
+      quote.className = "messageReply";
+      quote.textContent = "↪ " + meta.replyTo.username + "：" + meta.replyTo.message;
+      div.appendChild(quote);
+    }
 
+    const body = document.createElement("div");
+    body.className = "messageText";
+    body.textContent = name + "： " + message;
+    div.appendChild(body);
 
-    const div =
-      document.createElement(
-        "div"
-      );
-
-
-    div.className =
-      "message";
-
-
-    div.textContent =
-      name + "： " + message;
-
+    if (meta.id) {
+      const tools = document.createElement("div");
+      tools.className = "messageTools";
+      const read = document.createElement("span");
+      read.className = "readCount";
+      read.textContent = "既読 0人";
+      tools.appendChild(read);
+      const reply = document.createElement("button");
+      reply.type = "button";
+      reply.textContent = "返信";
+      reply.addEventListener("click", () => setReply(meta.id, name, message));
+      tools.appendChild(reply);
+      div.appendChild(tools);
+    }
 
     messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  }
 
+  function setReply(id, name, message) {
+    currentReplyTo = { id, username: name, message };
+    document.getElementById("replyBarText").textContent = "「" + name + "」への返信：" + message.slice(0, 80);
+    document.getElementById("replyBar").style.display = "block";
+    document.getElementById("messageInput").focus();
+  }
 
-    messages.scrollTop =
-      messages.scrollHeight;
-
+  function cancelReply() {
+    currentReplyTo = null;
+    const bar = document.getElementById("replyBar");
+    if (bar) bar.style.display = "none";
   }
 
 
@@ -1420,10 +1493,11 @@
       return;
     }
 
-    socket.emit(
-      "chatMessage",
-      message
-    );
+    socket.emit("chatMessage", {
+      message,
+      replyToId: currentReplyTo ? currentReplyTo.id : ""
+    });
+    cancelReply();
 
 
     input.value = "";
