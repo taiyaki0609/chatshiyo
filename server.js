@@ -139,6 +139,10 @@ io.on("connection", (socket) => {
     sendRoomList();
   });
 
+  socket.on("setUsername", (name) => {
+    socket.username = String(name || "").trim();
+  });
+
   socket.on("getRooms", () => sendRoomList());
 
   // 「たい焼き」だけがルーム一覧からルーム全体を削除できる
