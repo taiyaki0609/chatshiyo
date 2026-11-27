@@ -19,6 +19,27 @@
       box-sizing: border-box;
     }
 
+    #singleTabBlocked {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      background: #f2f4f7;
+      padding: 32px 20px;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    #singleTabBlocked .blockedCard {
+      width: 100%;
+      max-width: 460px;
+      padding: 28px;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 3px 14px rgba(0,0,0,.12);
+    }
+
 
     body {
 
@@ -607,6 +628,13 @@
 
 </div>
 
+<div id="singleTabBlocked">
+  <div class="blockedCard">
+    <h2>この端末では1つのタブだけ利用できます</h2>
+    <p>チャッツイヨは別のタブですでに開かれています。</p>
+    <p>先に開いたチャッツイヨのタブを閉じてから、このページを再読み込みしてください。</p>
+  </div>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 
@@ -617,6 +645,28 @@
   // Socket.IO
   const socket = io();
 
+  // 同じブラウザ内でチャッツイヨを同時に使えるタブを1つに制限
+  if (navigator.locks && window.isSecureContext) {
+    navigator.locks.request("chatshiyo-single-tab-lock", { ifAvailable: true }, async (lock) => {
+      if (!lock) {
+        document.getElementById("singleTabBlocked").style.display = "flex";
+        socket.disconnect();
+        return;
+      }
+      await new Promise((resolve) => {
+        window.addEventListener("pagehide", () => {
+          socket.disconnect();
+          resolve();
+        }, { once: true });
+      });
+    }).catch(() => {
+      document.getElementById("singleTabBlocked").style.display = "flex";
+      socket.disconnect();
+    });
+  } else {
+    document.getElementById("singleTabBlocked").style.display = "flex";
+    socket.disconnect();
+  }
 
   // 現在のユーザー名
   let username = "";
