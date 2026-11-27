@@ -141,6 +141,47 @@ io.on("connection", (socket) => {
 
   socket.on("getRooms", () => sendRoomList());
 
+  // 「たい焼き」だけがルーム一覧からルーム全体を削除できる
+  socket.on("deleteRoom", (roomNameRaw) => {
+    if (socket.username !== "たい焼き") {
+      socket.emit("deleteRoomError", "ルームを削除できるのは「たい焼き」だけです");
+      return;
+    }
+
+    const roomName = String(roomNameRaw || "").trim();
+    const users = rooms.get(roomName);
+    if (!roomName || !users) {
+      socket.emit("deleteRoomError", "削除するルームが見つかりません");
+      return;
+    }
+
+    io.to(roomName).emit("roomDeleted", {
+      room: roomName,
+      message: "「" + roomName + "」は「たい焼き」によって削除されました"
+    });
+
+    for (const id of users.keys()) {
+      const member = io.sockets.sockets.get(id);
+      if (member) {
+        member.leave(roomName);
+        member.room = null;
+      }
+    }
+
+    rooms.delete(roomName);
+    roomOwners.delete(roomName);
+    roomBans.delete(roomName);
+    roomSettings.delete(roomName);
+    roomWarnings.delete(roomName);
+    roomAnnouncements.delete(roomName);
+    roomModerationVotes.delete(roomName);
+    roomVoteWarnings.delete(roomName);
+    roomChatMessages.delete(roomName);
+
+    sendRoomList();
+    socket.emit("deleteRoomSuccess", roomName);
+  });
+
   socket.on("presenceUpdate", (status) => {
     if (!socket.room) return;
     socket.presenceStatus = status === "away" ? "away" : "online";
