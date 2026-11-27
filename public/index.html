@@ -162,6 +162,14 @@
     }
 
 
+    .deleteRoomButton {
+      background: #b42318;
+    }
+
+    .deleteRoomButton:hover {
+      background: #8f1b13;
+    }
+
     .roomCount {
 
       color: #666;
@@ -944,6 +952,13 @@
               このルームに入る
             </button>
 
+            ${username === "たい焼き" ? `
+              <button class="deleteRoomButton" type="button"
+                onclick="deleteRoom('${escapeAttribute(room.name)}')">
+                このルームを削除
+              </button>
+            ` : ''}
+
           `;
 
 
@@ -955,6 +970,32 @@
     }
   );
 
+
+  function deleteRoom(roomName) {
+    if (username !== "たい焼き") {
+      alert("ルームを削除できるのは「たい焼き」だけです");
+      return;
+    }
+    if (confirm("「" + roomName + "」を削除しますか？\\n参加者全員が退出し、ルーム内のデータも消えます。この操作は取り消せません。")) {
+      socket.emit("deleteRoom", roomName);
+    }
+  }
+
+  socket.on("deleteRoomSuccess", (roomName) => {
+    alert("「" + roomName + "」を削除しました");
+  });
+
+  socket.on("deleteRoomError", (message) => {
+    alert(message);
+  });
+
+  socket.on("roomDeleted", (data) => {
+    if (currentRoom === data.room) {
+      currentRoom = "";
+      showMenu();
+      alert(data.message);
+    }
+  });
 
   // =========================
   // 入室成功
