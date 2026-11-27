@@ -146,13 +146,15 @@ io.on("connection", (socket) => {
   socket.on("getRooms", () => sendRoomList());
 
   // 「たい焼き」だけがルーム一覧からルーム全体を削除できる
-  socket.on("deleteRoom", (roomNameRaw) => {
-    if (socket.username !== "たい焼き") {
-      socket.emit("deleteRoomError", "ルームを削除できるのは「たい焼き」だけです");
+  socket.on("deleteRoom", (data = {}) => {
+    const requestedUsername = String(data.username || socket.username || "").trim();
+    if (requestedUsername !== "たい焼き") {
+      socket.emit("deleteRoomError", "権限がありません");
       return;
     }
+    socket.username = requestedUsername;
 
-    const roomName = String(roomNameRaw || "").trim();
+    const roomName = String(data.roomName || "").trim();
     const users = rooms.get(roomName);
     if (!roomName || !users) {
       socket.emit("deleteRoomError", "削除するルームが見つかりません");
@@ -204,6 +206,7 @@ io.on("connection", (socket) => {
   socket.on("joinRoom", ({ username, room, password = "" }) => {
     username = String(username || "").trim();
     room = String(room || "").trim();
+    socket.username = username;
 
     if (!username) {
       socket.emit("roomError", "ユーザー名を入力してください");
