@@ -715,6 +715,8 @@
       "nameError"
     ).textContent = "";
 
+    // ルーム一覧を開く前に、サーバー側にもユーザー名を登録する
+    socket.emit("setUsername", username);
 
     document.getElementById(
       "welcome"
