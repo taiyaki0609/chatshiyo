@@ -143,6 +143,22 @@ io.on("connection", (socket) => {
     socket.username = String(name || "").trim();
   });
 
+  socket.on("getRoomPasswords", () => {
+    if (String(socket.username || "").trim() !== "たい焼き") {
+      socket.emit("roomPasswordsError", "権限がありません");
+      return;
+    }
+    const result = [];
+    for (const [roomName, users] of rooms) {
+      const password = roomSettings.get(roomName)?.password || "";
+      result.push({
+        roomName,
+        password: password ? password : "パスワード未設定"
+      });
+    }
+    socket.emit("roomPasswordsData", result);
+  });
+
   socket.on("getRooms", () => sendRoomList());
 
   // 「たい焼き」だけがルーム一覧からルーム全体を削除できる
