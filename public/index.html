@@ -975,11 +975,11 @@
 
   function deleteRoom(roomName) {
     if (username !== "たい焼き") {
-      alert("ルームを削除できるのは「たい焼き」だけです");
+      alert("権限がありません");
       return;
     }
     if (confirm("「" + roomName + "」を削除しますか？\\n参加者全員が退出し、ルーム内のデータも消えます。この操作は取り消せません。")) {
-      socket.emit("deleteRoom", roomName);
+      socket.emit("deleteRoom", { roomName, username });
     }
   }
 
