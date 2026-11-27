@@ -475,6 +475,10 @@
         🔔 通知を有効にする
       </button>
       <div id="notificationStatus" class="error"></div>
+      <button id="allRoomPasswordsButton" type="button" onclick="getAllRoomPasswords()" style="display:none">
+        🔑 全ルームのパスワードを確認
+      </button>
+      <div id="allRoomPasswordsResult" class="error"></div>
 
     </div>
 
@@ -767,6 +771,9 @@
 
     // ルーム一覧を開く前に、サーバー側にもユーザー名を登録する
     socket.emit("setUsername", username);
+    document.getElementById("allRoomPasswordsButton").style.display =
+      username === "たい焼き" ? "block" : "none";
+    document.getElementById("allRoomPasswordsResult").textContent = "";
 
     document.getElementById(
       "welcome"
@@ -807,6 +814,36 @@
 
   }
 
+
+  function getAllRoomPasswords() {
+    if (username !== "たい焼き") {
+      document.getElementById("allRoomPasswordsResult").textContent = "権限がありません";
+      return;
+    }
+    document.getElementById("allRoomPasswordsResult").textContent = "読み込み中...";
+    socket.emit("getRoomPasswords");
+  }
+
+  socket.on("roomPasswordsData", (rooms) => {
+    const output = document.getElementById("allRoomPasswordsResult");
+    output.replaceChildren();
+    if (!rooms.length) {
+      output.textContent = "現在ルームはありません";
+      return;
+    }
+    const heading = document.createElement("h3");
+    heading.textContent = "全ルームのパスワード";
+    output.appendChild(heading);
+    rooms.forEach((room) => {
+      const line = document.createElement("p");
+      line.textContent = room.roomName + "： " + room.password;
+      output.appendChild(line);
+    });
+  });
+
+  socket.on("roomPasswordsError", (message) => {
+    document.getElementById("allRoomPasswordsResult").textContent = message;
+  });
 
   function showMenu() {
 
