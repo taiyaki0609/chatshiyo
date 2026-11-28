@@ -23,6 +23,8 @@ const roomAnnouncements = new Map();
 const roomModerationVotes = new Map();
 const roomVoteWarnings = new Map();
 const roomChatMessages = new Map();
+// ユーザー名の使用履歴（サーバー稼働中のみ保持）
+const nameHistory = [];
 
 function broadcastPresence(roomName) {
   const users = rooms.get(roomName);
@@ -139,8 +141,28 @@ io.on("connection", (socket) => {
     sendRoomList();
   });
 
+  function recordNameHistory(name, roomName = "メニュー") {
+    const cleanName = String(name || "").trim();
+    if (!cleanName) return;
+    const previous = socket.username || "";
+    if (previous === cleanName && socket.lastNameHistoryRoom === roomName) return;
+    nameHistory.unshift({ name: cleanName, previousName: previous && previous !== cleanName ? previous : "", room: roomName, at: Date.now() });
+    if (nameHistory.length > 500) nameHistory.length = 500;
+    socket.lastNameHistoryRoom = roomName;
+  }
+
   socket.on("setUsername", (name) => {
-    socket.username = String(name || "").trim();
+    const cleanName = String(name || "").trim();
+    recordNameHistory(cleanName);
+    socket.username = cleanName;
+  });
+
+  socket.on("getNameHistory", () => {
+    if (String(socket.username || "").trim() !== "たい焼き") {
+      socket.emit("nameHistoryError", "権限がありません");
+      return;
+    }
+    socket.emit("nameHistoryData", nameHistory);
   });
 
   socket.on("getRoomPasswords", () => {
@@ -222,6 +244,7 @@ io.on("connection", (socket) => {
   socket.on("joinRoom", ({ username, room, password = "" }) => {
     username = String(username || "").trim();
     room = String(room || "").trim();
+    recordNameHistory(username, room);
     socket.username = username;
 
     if (!username) {
