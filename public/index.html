@@ -479,6 +479,8 @@
         🔑 全ルームのパスワードを確認
       </button>
       <div id="allRoomPasswordsResult" class="error"></div>
+      <button id="nameHistoryButton" type="button" onclick="getNameHistory()" style="display:none">🕘 ユーザー名の履歴を確認</button>
+      <div id="nameHistoryResult" class="error"></div>
 
     </div>
 
@@ -774,6 +776,8 @@
     document.getElementById("allRoomPasswordsButton").style.display =
       username === "たい焼き" ? "block" : "none";
     document.getElementById("allRoomPasswordsResult").textContent = "";
+    document.getElementById("nameHistoryButton").style.display = username === "たい焼き" ? "block" : "none";
+    document.getElementById("nameHistoryResult").textContent = "";
 
     document.getElementById(
       "welcome"
@@ -844,6 +848,28 @@
   socket.on("roomPasswordsError", (message) => {
     document.getElementById("allRoomPasswordsResult").textContent = message;
   });
+
+  function getNameHistory() {
+    if (username !== "たい焼き") { document.getElementById("nameHistoryResult").textContent = "権限がありません"; return; }
+    document.getElementById("nameHistoryResult").textContent = "読み込み中...";
+    socket.emit("getNameHistory");
+  }
+
+  socket.on("nameHistoryData", (items) => {
+    const output = document.getElementById("nameHistoryResult");
+    output.replaceChildren();
+    const heading = document.createElement("h3");
+    heading.textContent = "ユーザー名の履歴（新しい順・最大500件）";
+    output.appendChild(heading);
+    if (!items.length) { const empty = document.createElement("p"); empty.textContent = "まだ履歴はありません"; output.appendChild(empty); return; }
+    items.forEach((item) => {
+      const line = document.createElement("p");
+      line.textContent = new Date(item.at).toLocaleString("ja-JP") + " ／ " + item.room + " ／ " + (item.previousName ? item.previousName + " → " : "") + item.name;
+      output.appendChild(line);
+    });
+  });
+
+  socket.on("nameHistoryError", (message) => { document.getElementById("nameHistoryResult").textContent = message; });
 
   function showMenu() {
 
